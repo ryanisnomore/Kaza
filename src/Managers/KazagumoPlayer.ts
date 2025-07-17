@@ -1,231 +1,345 @@
-import { Player } from 'shoukaku';
 import { EventEmitter } from 'events';
+import { Player, TrackEndEvent, TrackStartEvent, TrackExceptionEvent, TrackStuckEvent, WebSocketClosedEvent } from 'shoukaku';
+import { Kazagumo } from '../Kazagumo';
 import { KazagumoQueue } from './KazagumoQueue';
-import { 
-    KazagumoTrack, 
-    KazagumoPlayerOptions, 
-    RepeatMode,
-    KazagumoNode
-} from '../types';
+import { KazagumoTrack, PlayerOptions, FilterConfig } from '../types/KazagumoTypes';
 
 export class KazagumoPlayer extends EventEmitter {
-    public shoukaku: Player;
-    public guildId: string;
-    public voiceId: string;
-    public textId?: string;
-    public queue: KazagumoQueue;
-    public current: KazagumoTrack | null = null;
-    public position: number = 0;
-    public ping: number = 0;
-    public timestamp: number = 0;
-    public volume: number = 100;
-    public paused: boolean = false;
-    public playing: boolean = false;
-    public connected: boolean = false;
-    public node: KazagumoNode;
-    private _deaf: boolean;
-    private _mute: boolean;
+  public readonly kazagumo: Kazagumo;
+  public readonly guildId: string;
+  public readonly voiceId: string;
+  public readonly textId: string;
+  public readonly queue: KazagumoQueue;
+  public filters: FilterConfig;
+  
+  public shoukaku: Player | null = null;
+  public currentTrack: KazagumoTrack | null = null;
+  public position: number = 0;
+  public playing: boolean = false;
+  public paused: boolean = false;
+  public volume: number = 100;
+  public ping: number = 0;
+  public timestamp: number = 0;
+  public isConnected: boolean = false;
+  public deaf: boolean = false;
+  public mute: boolean = false;
 
-    constructor(options: KazagumoPlayerOptions) {
-        super();
+  private positionInterval: NodeJS.Timeout | null = null;
+  private readonly options: PlayerOptions;
 
-        this.guildId = options.guildId;
-        this.voiceId = options.voiceId;
-        this.textId = options.textId || '';
-        this.node = options.node!;
-        this._deaf = options.deaf || false;
-        this._mute = options.mute || false;
-        this.volume = options.volume || 100;
+  constructor(kazagumo: Kazagumo, options: PlayerOptions) {
+    super();
+    
+    this.kazagumo = kazagumo;
+    this.options = options;
+    this.guildId = options.guildId;
+    this.voiceId = options.voiceId;
+    this.textId = options.textId || '';
+    this.deaf = options.deaf || false;
+    this.mute = options.mute || false;
+    this.volume = options.volume || 100;
+    
+    this.queue = new KazagumoQueue(this);
+    this.filters = {};
+    
+    this.initialize();
+  }
 
-        this.queue = new KazagumoQueue();
-        // Create player through Shoukaku
-        this.shoukaku = (this.node as any).joinChannel({
-            guildId: this.guildId,
-            channelId: this.voiceId,
-            shardId: 0,
-            deaf: this._deaf,
-            mute: this._mute
-        });
+  /**
+   * Initialize the player
+   */
+  private async initialize(): Promise<void> {
+    try {
+      this.shoukaku = await this.kazagumo.shoukaku.joinVoiceChannel({
+        guildId: this.guildId,
+        channelId: this.voiceId,
+        shardId: 0,
+        deaf: this.deaf,
+        mute: this.mute
+      });
 
-        this.setupEventListeners();
+      this.isConnected = true;
+      this.setupEventListeners();
+      this.startPositionTracking();
+    } catch (error) {
+      this.emit('error', error);
+    }
+  }
+
+  /**
+   * Set up event listeners for the Shoukaku player
+   */
+  private setupEventListeners(): void {
+    if (!this.shoukaku) return;
+
+    this.shoukaku.on('start', (data: TrackStartEvent) => {
+      this.playing = true;
+      this.paused = false;
+      this.timestamp = Date.now();
+      this.emit('trackStart', this, data.track);
+    });
+
+    this.shoukaku.on('end', (data: TrackEndEvent) => {
+      this.playing = false;
+      this.paused = false;
+      this.position = 0;
+      
+      const track = this.currentTrack;
+      this.currentTrack = null;
+      
+      this.emit('trackEnd', this, track);
+      
+      if (data.reason !== 'replaced') {
+        this.next();
+      }
+    });
+
+    this.shoukaku.on('exception', (data: TrackExceptionEvent) => {
+      this.emit('trackException', this, this.currentTrack, data.exception);
+    });
+
+    this.shoukaku.on('stuck', (data: TrackStuckEvent) => {
+      this.emit('trackStuck', this, this.currentTrack);
+    });
+
+    this.shoukaku.on('closed', (data: WebSocketClosedEvent) => {
+      this.isConnected = false;
+      this.emit('playerClosed', this, data);
+    });
+  }
+
+  /**
+   * Start position tracking
+   */
+  private startPositionTracking(): void {
+    if (this.positionInterval) {
+      clearInterval(this.positionInterval);
     }
 
-    private setupEventListeners(): void {
-        this.shoukaku.on('start', (data) => {
-            this.playing = true;
-            this.paused = false;
-            this.emit('trackStart', this, this.current);
-        });
+    this.positionInterval = setInterval(() => {
+      if (this.playing && !this.paused) {
+        this.position += 1000;
+      }
+    }, 1000);
+  }
 
-        this.shoukaku.on('end', (data) => {
-            this.playing = false;
-            this.position = 0;
-            
-            if (this.current) {
-                this.queue.addToPrevious(this.current);
-            }
+  /**
+   * Stop position tracking
+   */
+  private stopPositionTracking(): void {
+    if (this.positionInterval) {
+      clearInterval(this.positionInterval);
+      this.positionInterval = null;
+    }
+  }
 
-            if (data.reason === 'replaced') {
-                this.emit('trackEnd', this, this.current, data.reason);
-                return;
-            }
-
-            const nextTrack = this.queue.getNext();
-            if (nextTrack) {
-                this.current = nextTrack;
-                this.play(nextTrack);
-            } else {
-                this.current = null;
-                this.emit('queueEnd', this);
-            }
-
-            this.emit('trackEnd', this, this.current, data.reason);
-        });
-
-        this.shoukaku.on('closed', (data) => {
-            this.playing = false;
-            this.connected = false;
-            this.emit('playerClosed', this, data);
-        });
-
-        this.shoukaku.on('exception', (data) => {
-            this.playing = false;
-            this.emit('playerException', this, data);
-        });
-
-        this.shoukaku.on('update', (data) => {
-            this.position = data.state.position;
-            this.ping = data.state.ping;
-            this.timestamp = data.state.time;
-            this.emit('playerUpdate', this, data);
-        });
-
-        this.shoukaku.on('stuck', (data) => {
-            this.emit('playerStuck', this, data);
-        });
-
-        this.shoukaku.on('resumed', () => {
-            this.paused = false;
-            this.playing = true;
-            this.emit('playerResumed', this);
-        });
+  /**
+   * Play the current track or a specific track
+   */
+  public async play(track?: KazagumoTrack): Promise<void> {
+    if (!this.shoukaku || !this.isConnected) {
+      throw new Error('Player is not connected');
     }
 
-    public async play(track?: KazagumoTrack): Promise<void> {
-        if (track) {
-            this.current = track;
-        } else if (!this.current) {
-            const nextTrack = this.queue.getNext();
-            if (!nextTrack) {
-                throw new Error('No track to play');
-            }
-            this.current = nextTrack;
-        }
-
-        await this.shoukaku.playTrack({ 
-            track: { encoded: this.current!.encoded }
-        });
-        
-        this.playing = true;
-        this.paused = false;
+    const trackToPlay = track || this.queue.current;
+    if (!trackToPlay) {
+      throw new Error('No track to play');
     }
 
-    public async stop(): Promise<void> {
+    this.currentTrack = trackToPlay;
+    await this.shoukaku.playTrack({ track: { encoded: trackToPlay.track } });
+  }
+
+  /**
+   * Pause/resume the player
+   */
+  public async pause(pause: boolean = true): Promise<void> {
+    if (!this.shoukaku || !this.isConnected) {
+      throw new Error('Player is not connected');
+    }
+
+    this.paused = pause;
+    await this.shoukaku.setPaused(pause);
+  }
+
+  /**
+   * Stop the player
+   */
+  public async stop(): Promise<void> {
+    if (!this.shoukaku || !this.isConnected) {
+      throw new Error('Player is not connected');
+    }
+
+    this.playing = false;
+    this.paused = false;
+    this.position = 0;
+    this.currentTrack = null;
+    
+    await this.shoukaku.stopTrack();
+  }
+
+  /**
+   * Skip to the next track
+   */
+  public async skip(): Promise<void> {
+    if (!this.shoukaku || !this.isConnected) {
+      throw new Error('Player is not connected');
+    }
+
+    const nextTrack = this.queue.next();
+    if (nextTrack) {
+      await this.play(nextTrack);
+    } else {
+      await this.stop();
+      this.emit('queueEnd', this);
+    }
+  }
+
+  /**
+   * Go to the next track in queue
+   */
+  public next(): void {
+    const nextTrack = this.queue.next();
+    if (nextTrack) {
+      this.play(nextTrack).catch(error => {
+        this.emit('error', error);
+      });
+    } else {
+      this.emit('queueEnd', this);
+    }
+  }
+
+  /**
+   * Set volume
+   */
+  public async setVolume(volume: number): Promise<void> {
+    if (!this.shoukaku || !this.isConnected) {
+      throw new Error('Player is not connected');
+    }
+
+    this.volume = Math.max(0, Math.min(100, volume));
+    await this.shoukaku.setGlobalVolume(this.volume);
+  }
+
+  /**
+   * Set filters
+   */
+  public async setFilters(filters: FilterConfig): Promise<void> {
+    if (!this.shoukaku || !this.isConnected) {
+      throw new Error('Player is not connected');
+    }
+
+    this.filters = filters;
+    await this.shoukaku.setFilters(filters as any);
+  }
+
+  /**
+   * Clear all filters
+   */
+  public async clearFilters(): Promise<void> {
+    if (!this.shoukaku || !this.isConnected) {
+      throw new Error('Player is not connected');
+    }
+
+    this.filters = {};
+    await this.shoukaku.setFilters({});
+  }
+
+  /**
+   * Seek to a specific position
+   */
+  public async seek(position: number): Promise<void> {
+    if (!this.shoukaku || !this.isConnected) {
+      throw new Error('Player is not connected');
+    }
+
+    this.position = position;
+    await this.shoukaku.seekTo(position);
+  }
+
+  /**
+   * Move to a different voice channel
+   */
+  public async moveVoiceChannel(channelId: string): Promise<void> {
+    if (!this.shoukaku || !this.isConnected) {
+      throw new Error('Player is not connected');
+    }
+
+    // Simple implementation - reconnect to new channel
+    await this.destroy();
+    const newPlayer = await this.kazagumo.shoukaku.joinVoiceChannel({
+      guildId: this.guildId,
+      channelId: channelId,
+      shardId: 0,
+      deaf: this.deaf,
+      mute: this.mute
+    });
+    this.shoukaku = newPlayer;
+    this.isConnected = true;
+    this.setupEventListeners();
+  }
+
+  /**
+   * Get queue information
+   */
+  public getQueueInfo(): {
+    current: KazagumoTrack | null;
+    queue: KazagumoTrack[];
+    totalLength: number;
+    repeat: number;
+    shuffle: boolean;
+  } {
+    return {
+      current: this.currentTrack,
+      queue: this.queue.tracks,
+      totalLength: this.queue.tracks.reduce((sum, track) => sum + track.info.length, 0),
+      repeat: this.queue.repeat,
+      shuffle: this.queue.shuffle
+    };
+  }
+
+  /**
+   * Get playback information
+   */
+  public getPlaybackInfo(): {
+    track: KazagumoTrack | null;
+    position: number;
+    volume: number;
+    paused: boolean;
+    playing: boolean;
+    ping: number;
+  } {
+    return {
+      track: this.currentTrack,
+      position: this.position,
+      volume: this.volume,
+      paused: this.paused,
+      playing: this.playing,
+      ping: this.ping
+    };
+  }
+
+  /**
+   * Destroy the player
+   */
+  public async destroy(): Promise<void> {
+    this.stopPositionTracking();
+    
+    if (this.shoukaku && this.isConnected) {
+      try {
         await this.shoukaku.stopTrack();
-        this.playing = false;
-        this.position = 0;
-        this.current = null;
+      } catch (error) {
+        // Ignore errors during destruction
+      }
     }
-
-    public async pause(): Promise<void> {
-        await this.shoukaku.setPaused(true);
-        this.paused = true;
-        this.playing = false;
-    }
-
-    public async resume(): Promise<void> {
-        await this.shoukaku.setPaused(false);
-        this.paused = false;
-        this.playing = true;
-    }
-
-    public async skip(): Promise<void> {
-        await this.shoukaku.stopTrack();
-    }
-
-    public async seek(position: number): Promise<void> {
-        await this.shoukaku.seekTo(position);
-        this.position = position;
-    }
-
-    public async setVolume(volume: number): Promise<void> {
-        if (volume < 0 || volume > 200) {
-            throw new Error('Volume must be between 0 and 200');
-        }
-        
-        await this.shoukaku.setGlobalVolume(volume);
-        this.volume = volume;
-    }
-
-    public async setFilters(filters: any): Promise<void> {
-        await this.shoukaku.setFilters(filters);
-    }
-
-    public async connect(voiceId?: string): Promise<void> {
-        if (voiceId) {
-            this.voiceId = voiceId;
-        }
-        this.connected = true;
-    }
-
-    public async disconnect(): Promise<void> {
-        (this.shoukaku as any).connection?.disconnect();
-        this.connected = false;
-    }
-
-    public async destroy(): Promise<void> {
-        await this.shoukaku.destroy();
-        this.connected = false;
-        this.playing = false;
-        this.current = null;
-        this.queue.clear();
-        this.emit('playerDestroy', this);
-        this.removeAllListeners();
-    }
-
-    public async move(voiceId: string): Promise<void> {
-        this.voiceId = voiceId;
-        await this.shoukaku.move(voiceId);
-    }
-
-    public get formattedPosition(): string {
-        return this.formatTime(this.position);
-    }
-
-    public get formattedDuration(): string {
-        return this.current ? this.formatTime(this.current.info.length || 0) : '0:00';
-    }
-
-    private formatTime(ms: number): string {
-        const minutes = Math.floor(ms / 60000);
-        const seconds = Math.floor((ms % 60000) / 1000);
-        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    }
-
-    public getStats() {
-        return {
-            guildId: this.guildId,
-            voiceId: this.voiceId,
-            textId: this.textId,
-            playing: this.playing,
-            paused: this.paused,
-            connected: this.connected,
-            position: this.position,
-            volume: this.volume,
-            ping: this.ping,
-            current: this.current,
-            queue: this.queue.getStats(),
-            node: this.node.name
-        };
-    }
+    
+    this.isConnected = false;
+    this.playing = false;
+    this.paused = false;
+    this.currentTrack = null;
+    this.queue.clear();
+    
+    this.emit('playerDestroy', this);
+    this.removeAllListeners();
+  }
 }

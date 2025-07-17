@@ -29,43 +29,55 @@ export class SearchManager {
             
             if (!result || !result.tracks.length) {
                 return {
-                    type: 'track',
-                    tracks: [],
-                    source: searchEngine
+                    loadType: 'empty',
+                    tracks: []
                 };
             }
 
             const tracks: KazagumoTrack[] = result.tracks
                 .slice(0, options.limit || 10)
                 .map((track: any) => ({
-                    encoded: track.encoded,
+                    track: track.encoded,
                     info: {
-                        ...track.info,
-                        sourceName: this.extractSourceName(track.info.uri || ''),
+                        identifier: track.info.identifier,
+                        title: track.info.title,
+                        author: track.info.author,
+                        length: track.info.length,
                         artworkUrl: track.info.artworkUrl || this.getArtworkUrl(track.info),
-                        albumName: track.pluginInfo?.albumName,
-                        artistUrl: track.pluginInfo?.artistUrl,
-                        albumUrl: track.pluginInfo?.albumUrl,
-                        preview: track.pluginInfo?.previewUrl,
-                        isrc: track.pluginInfo?.isrc
+                        uri: track.info.uri,
+                        isrc: track.info.isrc || track.pluginInfo?.isrc,
+                        sourceName: this.extractSourceName(track.info.uri || ''),
+                        isSeekable: track.info.isSeekable ?? true,
+                        isStream: track.info.isStream ?? false,
+                        position: track.info.position || 0
                     },
                     pluginInfo: track.pluginInfo || {},
-                    requester: options.requester
+                    userData: options.requester
                 }));
 
-            return {
-                type: result.loadType === 'playlist' ? 'playlist' : 'track',
-                tracks,
-                playlistName: result.playlistInfo?.name,
-                source: searchEngine
+            const searchResult: KazagumoSearchResult = {
+                loadType: result.loadType === 'PLAYLIST_LOADED' ? 'playlist' : 'search',
+                tracks
             };
+
+            if (result.playlistInfo) {
+                searchResult.playlistInfo = {
+                    name: result.playlistInfo.name,
+                    selectedTrack: result.playlistInfo.selectedTrack
+                };
+            }
+
+            return searchResult;
 
         } catch (error) {
             console.error(`Search error for query "${query}":`, error);
             return {
-                type: 'track',
+                loadType: 'error',
                 tracks: [],
-                source: searchEngine
+                exception: {
+                    message: error instanceof Error ? error.message : 'Unknown error',
+                    severity: 'common'
+                }
             };
         }
     }
@@ -144,7 +156,7 @@ export class SearchManager {
             'flowery': 'flowery'
         };
 
-        return engineMap[source.toLowerCase()] || 'ytsearch';
+        return (engineMap[source.toLowerCase()] as SearchEngine) || 'ytsearch';
     }
 
     /**
@@ -200,7 +212,7 @@ export class SearchManager {
             'spsearch', 'amsearch', 'dzsearch',
             'scsearch', 'jiosaavn', 'bandcamp',
             'qobuz', 'tidal', 'flowery'
-        ];
+        ] as SearchEngine[];
     }
 
     /**
