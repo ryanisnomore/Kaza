@@ -9,22 +9,22 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-console.log('🔧 Preparing Kaza for GitHub installation...');
+console.log('Preparing Kaza for GitHub installation...');
 
 // Step 1: Ensure dist folder exists and is built
-console.log('📦 1. Building distribution files...');
+console.log('1. Building distribution files...');
 try {
   if (!fs.existsSync('./dist')) {
     execSync('npm run build', { stdio: 'inherit' });
   }
-  console.log('   ✅ Distribution files ready');
+  console.log('Distribution files ready');
 } catch (error) {
-  console.error('   ❌ Build failed:', error.message);
+  console.error('Build failed:', error.message);
   process.exit(1);
 }
 
 // Step 2: Verify package.json has correct GitHub fields
-console.log('📦 2. Verifying package.json configuration...');
+console.log('2. Verifying package.json configuration...');
 const packageJson = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
 
 const requiredFields = {
@@ -41,28 +41,28 @@ let isValid = true;
 Object.entries(requiredFields).forEach(([key, expectedValue]) => {
   if (typeof expectedValue === 'object') {
     if (!packageJson[key] || JSON.stringify(packageJson[key]) !== JSON.stringify(expectedValue)) {
-      console.log(`   ⚠️  ${key} field needs update`);
+      console.log(`${key} field needs update`);
       isValid = false;
     }
   } else {
     if (packageJson[key] !== expectedValue) {
-      console.log(`   ⚠️  ${key} field needs update`);
+      console.log(`${key} field needs update`);
       isValid = false;
     }
   }
 });
 
 if (isValid) {
-  console.log('   ✅ Package.json configuration is correct');
+  console.log('Package.json configuration is correct');
 } else {
-  console.log('   ⚠️  Some fields need manual update (package.json is protected)');
+  console.log('Some fields need manual update (package.json is protected)');
 }
 
 // Step 3: Create installation test script
-console.log('📦 3. Creating installation test script...');
+console.log('3. Creating installation test script...');
 const testScript = `#!/bin/bash
 
-echo "🧪 Testing GitHub installation of Kaza..."
+echo "Testing GitHub installation of Kaza..."
 
 # Create temporary test directory
 TEST_DIR="test-github-install"
@@ -74,7 +74,7 @@ cd $TEST_DIR
 npm init -y
 
 # Test GitHub installation methods
-echo "📦 Testing: npm install git+https://github.com/ryanisnomore/Kaza.git"
+echo "Testing: npm install git+https://github.com/ryanisnomore/Kaza.git"
 npm install git+https://github.com/ryanisnomore/Kaza.git
 
 # Test if module can be required
@@ -94,10 +94,10 @@ echo "🎉 GitHub installation test completed!"
 
 fs.writeFileSync('./test-github-install.sh', testScript);
 fs.chmodSync('./test-github-install.sh', '755');
-console.log('   ✅ Test script created: ./test-github-install.sh');
+console.log('Test script created: ./test-github-install.sh');
 
 // Step 4: Verify all required files exist
-console.log('📦 4. Verifying required files...');
+console.log('4. Verifying required files...');
 const requiredFiles = [
   'dist/index.js',
   'dist/index.d.ts',
@@ -109,15 +109,15 @@ const requiredFiles = [
 let allFilesExist = true;
 requiredFiles.forEach(file => {
   if (fs.existsSync(file)) {
-    console.log(`   ✅ ${file}`);
+    console.log(`${file}`);
   } else {
-    console.log(`   ❌ ${file} - MISSING`);
+    console.log(`${file} - MISSING`);
     allFilesExist = false;
   }
 });
 
 // Step 5: Create example bot for testing
-console.log('📦 5. Creating example Discord bot configuration...');
+console.log('5. Creating example Discord bot configuration...');
 const exampleBotConfig = `/**
  * Example Discord bot using Kaza from GitHub installation
  * 
