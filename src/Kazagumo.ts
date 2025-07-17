@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import { Shoukaku, Connector, NodeOption } from 'shoukaku';
 import { KazagumoPlayer } from './Managers/KazagumoPlayer';
-import { EnhancedSearchManager } from './Managers/SearchManager';
+import { EnhancedSearchManager } from './Managers/EnhancedSearchManager';
 import { PluginConfig } from './config/PluginConfig';
 import { ErrorHandler, ErrorCode } from './Utils/ErrorHandler';
 import { URLParser } from './Utils/URLParser';
