@@ -1,317 +1,352 @@
 /**
- * Enhanced plugin configuration system for Kaza
+ * PluginConfig - Plugin configuration and management system
  */
 
+import { PluginOptions, PluginInterface, PluginMetadata } from '../types';
 import { ErrorHandler, ErrorCode } from '../Utils/ErrorHandler';
 
-export interface PluginConfigOptions {
-    enabled: boolean;
-    priority: number;
-    autoLoad: boolean;
-    dependencies?: string[];
-    config?: Record<string, any>;
-}
-
-export interface PluginManifest {
-    name: string;
-    version: string;
-    description?: string;
-    author?: string;
-    main: string;
-    dependencies?: string[];
-    kazaVersion?: string;
-    config?: PluginConfigOptions;
-}
-
 export class PluginConfig {
-    private static readonly defaultConfig: PluginConfigOptions = {
-        enabled: true,
-        priority: 10,
-        autoLoad: true,
-        dependencies: [],
-        config: {}
+  private readonly plugins: Map<string, PluginInterface> = new Map();
+  private readonly pluginOptions: Record<string, PluginOptions>;
+  private readonly errorHandler: ErrorHandler;
+  private readonly loadedPlugins: Set<string> = new Set();
+
+  constructor(pluginOptions: Record<string, PluginOptions> = {}) {
+    this.pluginOptions = pluginOptions;
+    this.errorHandler = new ErrorHandler();
+  }
+
+  /**
+   * Initialize all enabled plugins
+   */
+  public async initializePlugins(kazagumo: any): Promise<void> {
+    const pluginNames = Object.keys(this.pluginOptions);
+    
+    for (const pluginName of pluginNames) {
+      const options = this.pluginOptions[pluginName];
+      
+      if (options?.enabled) {
+        try {
+          await this.loadPlugin(pluginName, kazagumo);
+        } catch (error) {
+          this.errorHandler.handleError(
+            error as Error,
+            `Plugin initialization: ${pluginName}`
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Load a specific plugin
+   */
+  public async loadPlugin(name: string, kazagumo: any): Promise<void> {
+    if (this.loadedPlugins.has(name)) {
+      return;
+    }
+
+    try {
+      // Dynamic import for built-in plugins
+      const PluginClass = await this.importPlugin(name);
+      
+      if (!PluginClass) {
+        throw this.errorHandler.createError(
+          ErrorCode.PLUGIN_NOT_FOUND,
+          `Plugin '${name}' not found`,
+          false,
+          ['Check plugin name', 'Verify plugin is installed', 'Check plugin path']
+        );
+      }
+
+      const plugin = new PluginClass();
+      
+      // Validate plugin interface
+      this.validatePlugin(plugin);
+      
+      // Initialize plugin
+      await plugin.initialize(kazagumo);
+      
+      this.plugins.set(name, plugin);
+      this.loadedPlugins.add(name);
+      
+      console.log(`Plugin '${name}' loaded successfully`);
+    } catch (error) {
+      throw this.errorHandler.createError(
+        ErrorCode.PLUGIN_INITIALIZATION_ERROR,
+        `Failed to load plugin '${name}': ${(error as Error).message}`,
+        true,
+        ['Check plugin configuration', 'Verify plugin dependencies', 'Update plugin version']
+      );
+    }
+  }
+
+  /**
+   * Unload a specific plugin
+   */
+  public async unloadPlugin(name: string): Promise<void> {
+    const plugin = this.plugins.get(name);
+    
+    if (!plugin) {
+      throw this.errorHandler.createError(
+        ErrorCode.PLUGIN_NOT_FOUND,
+        `Plugin '${name}' is not loaded`,
+        false
+      );
+    }
+
+    try {
+      await plugin.destroy();
+      this.plugins.delete(name);
+      this.loadedPlugins.delete(name);
+      
+      console.log(`Plugin '${name}' unloaded successfully`);
+    } catch (error) {
+      throw this.errorHandler.createError(
+        ErrorCode.PLUGIN_EXECUTION_ERROR,
+        `Failed to unload plugin '${name}': ${(error as Error).message}`,
+        true
+      );
+    }
+  }
+
+  /**
+   * Get loaded plugin
+   */
+  public getPlugin(name: string): PluginInterface | null {
+    return this.plugins.get(name) || null;
+  }
+
+  /**
+   * Check if plugin is loaded
+   */
+  public isPluginLoaded(name: string): boolean {
+    return this.loadedPlugins.has(name);
+  }
+
+  /**
+   * Get all loaded plugins
+   */
+  public getLoadedPlugins(): string[] {
+    return Array.from(this.loadedPlugins);
+  }
+
+  /**
+   * Get plugin metadata
+   */
+  public getPluginMetadata(name: string): PluginMetadata | null {
+    const plugin = this.plugins.get(name);
+    return plugin ? plugin.metadata : null;
+  }
+
+  /**
+   * Get plugin options
+   */
+  public getPluginOptions(name: string): PluginOptions | null {
+    return this.pluginOptions[name] || null;
+  }
+
+  /**
+   * Update plugin options
+   */
+  public updatePluginOptions(name: string, options: Partial<PluginOptions>): void {
+    if (this.pluginOptions[name]) {
+      if (options) {
+        Object.assign(this.pluginOptions[name]!, options);
+      }
+    } else {
+      this.pluginOptions[name] = options as PluginOptions;
+    }
+  }
+
+  /**
+   * Check if all plugins are healthy
+   */
+  public arePluginsHealthy(): boolean {
+    for (const plugin of this.plugins.values()) {
+      if (!plugin.metadata.enabled) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Get plugin execution order by priority
+   */
+  public getPluginExecutionOrder(): string[] {
+    const plugins = Array.from(this.plugins.entries());
+    
+    plugins.sort(([, a], [, b]) => {
+      const priorityA = a.metadata.priority || 0;
+      const priorityB = b.metadata.priority || 0;
+      return priorityB - priorityA; // Higher priority first
+    });
+    
+    return plugins.map(([name]) => name);
+  }
+
+  /**
+   * Execute plugin hook
+   */
+  public async executePluginHook(
+    hookName: keyof PluginInterface,
+    ...args: any[]
+  ): Promise<void> {
+    const executionOrder = this.getPluginExecutionOrder();
+    
+    for (const pluginName of executionOrder) {
+      const plugin = this.plugins.get(pluginName);
+      
+      if (!plugin || !plugin.metadata.enabled) {
+        continue;
+      }
+
+      const hookFunction = plugin[hookName];
+      
+      if (typeof hookFunction === 'function') {
+        try {
+          const result = hookFunction.apply(plugin, args);
+          if (result && typeof result.then === 'function') {
+            await result;
+          }
+        } catch (error) {
+          this.errorHandler.handleError(
+            error as Error,
+            `Plugin hook execution: ${pluginName}.${hookName}`
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Validate plugin interface
+   */
+  private validatePlugin(plugin: any): void {
+    if (!plugin.metadata) {
+      throw new Error('Plugin must have metadata property');
+    }
+
+    const required = ['name', 'version', 'description', 'author'];
+    for (const field of required) {
+      if (!plugin.metadata[field]) {
+        throw new Error(`Plugin metadata missing required field: ${field}`);
+      }
+    }
+
+    if (typeof plugin.initialize !== 'function') {
+      throw new Error('Plugin must have initialize method');
+    }
+
+    if (typeof plugin.destroy !== 'function') {
+      throw new Error('Plugin must have destroy method');
+    }
+  }
+
+  /**
+   * Import plugin dynamically
+   */
+  private async importPlugin(name: string): Promise<any> {
+    try {
+      // Try to import built-in plugins first
+      const builtInPlugins: Record<string, () => Promise<any>> = {
+        'PlayerMoved': () => import('../Plugins/PlayerMoved').then(m => m.PlayerMoved),
+      };
+
+      if (builtInPlugins[name]) {
+        return await builtInPlugins[name]!();
+      }
+
+      // Try to import external plugin
+      return await import(name);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Get plugin statistics
+   */
+  public getPluginStats(): {
+    totalPlugins: number;
+    enabledPlugins: number;
+    disabledPlugins: number;
+    pluginsByPriority: Array<{ name: string; priority: number }>;
+  } {
+    const totalPlugins = Object.keys(this.pluginOptions).length;
+    const enabledPlugins = this.loadedPlugins.size;
+    const disabledPlugins = totalPlugins - enabledPlugins;
+    
+    const pluginsByPriority = Array.from(this.plugins.entries())
+      .map(([name, plugin]) => ({
+        name,
+        priority: plugin.metadata.priority || 0
+      }))
+      .sort((a, b) => b.priority - a.priority);
+
+    return {
+      totalPlugins,
+      enabledPlugins,
+      disabledPlugins,
+      pluginsByPriority
     };
+  }
 
-    private static readonly builtinPlugins: Record<string, PluginConfigOptions> = {
-        'PlayerMoved': {
-            enabled: true,
-            priority: 100,
-            autoLoad: true,
-            dependencies: [],
-            config: {
-                autoReconnect: true,
-                maxReconnectAttempts: 3,
-                reconnectDelay: 5000
-            }
-        },
-        'AutoLeave': {
-            enabled: false,
-            priority: 50,
-            autoLoad: false,
-            dependencies: [],
-            config: {
-                emptyChannelTimeout: 300000, // 5 minutes
-                aloneTimeout: 60000, // 1 minute
-                queueEndTimeout: 30000 // 30 seconds
-            }
-        },
-        'QueueSaver': {
-            enabled: false,
-            priority: 30,
-            autoLoad: false,
-            dependencies: [],
-            config: {
-                saveOnShutdown: true,
-                autoSaveInterval: 600000, // 10 minutes
-                maxSavedQueues: 100
-            }
-        },
-        'VolumeNormalizer': {
-            enabled: false,
-            priority: 20,
-            autoLoad: false,
-            dependencies: [],
-            config: {
-                targetLUFS: -16,
-                maxGain: 6,
-                algorithm: 'replaygain'
-            }
-        },
-        'CrossFade': {
-            enabled: false,
-            priority: 15,
-            autoLoad: false,
-            dependencies: [],
-            config: {
-                duration: 3000,
-                curve: 'linear',
-                autoEnable: false
-            }
-        }
+  /**
+   * Destroy all plugins
+   */
+  public async destroyPlugins(): Promise<void> {
+    const pluginNames = Array.from(this.loadedPlugins);
+    
+    for (const pluginName of pluginNames) {
+      try {
+        await this.unloadPlugin(pluginName);
+      } catch (error) {
+        this.errorHandler.handleError(
+          error as Error,
+          `Plugin destruction: ${pluginName}`
+        );
+      }
+    }
+  }
+
+  /**
+   * Check plugin dependencies
+   */
+  public checkPluginDependencies(name: string): {
+    satisfied: boolean;
+    missing: string[];
+  } {
+    const plugin = this.plugins.get(name);
+    
+    if (!plugin) {
+      return { satisfied: false, missing: [] };
+    }
+
+    const dependencies = plugin.metadata.dependencies || [];
+    const missing = dependencies.filter(dep => !this.isPluginLoaded(dep));
+
+    return {
+      satisfied: missing.length === 0,
+      missing
     };
+  }
 
-    private plugins: Map<string, PluginConfigOptions> = new Map();
-    private loadOrder: string[] = [];
-
-    constructor(customConfig?: Record<string, Partial<PluginConfigOptions>>) {
-        this.initializePlugins(customConfig);
+  /**
+   * Get plugin configuration schema
+   */
+  public getPluginConfigSchema(): Record<string, any> {
+    const schema: Record<string, any> = {};
+    
+    for (const [name, plugin] of this.plugins) {
+      schema[name] = {
+        enabled: { type: 'boolean', default: true },
+        priority: { type: 'number', default: 0 },
+        config: { type: 'object', default: {} }
+      };
     }
-
-    /**
-     * Initialize plugin configurations
-     */
-    private initializePlugins(customConfig?: Record<string, Partial<PluginConfigOptions>>): void {
-        // Load builtin plugins with defaults
-        for (const [name, config] of Object.entries(PluginConfig.builtinPlugins)) {
-            const mergedConfig = this.mergeConfig(config, customConfig?.[name]);
-            this.plugins.set(name, mergedConfig);
-        }
-
-        // Add custom plugins
-        if (customConfig) {
-            for (const [name, config] of Object.entries(customConfig)) {
-                if (!PluginConfig.builtinPlugins[name]) {
-                    const mergedConfig = this.mergeConfig(PluginConfig.defaultConfig, config);
-                    this.plugins.set(name, mergedConfig);
-                }
-            }
-        }
-
-        this.calculateLoadOrder();
-    }
-
-    /**
-     * Merge plugin configurations
-     */
-    private mergeConfig(
-        defaultConfig: PluginConfigOptions,
-        customConfig?: Partial<PluginConfigOptions>
-    ): PluginConfigOptions {
-        if (!customConfig) return { ...defaultConfig };
-
-        return {
-            enabled: customConfig.enabled ?? defaultConfig.enabled,
-            priority: customConfig.priority ?? defaultConfig.priority,
-            autoLoad: customConfig.autoLoad ?? defaultConfig.autoLoad,
-            dependencies: customConfig.dependencies || defaultConfig.dependencies || [],
-            config: { ...defaultConfig.config, ...customConfig.config }
-        };
-    }
-
-    /**
-     * Calculate plugin load order based on dependencies and priority
-     */
-    private calculateLoadOrder(): void {
-        const sorted: string[] = [];
-        const visited = new Set<string>();
-        const visiting = new Set<string>();
-
-        const visit = (pluginName: string): void => {
-            if (visiting.has(pluginName)) {
-                throw ErrorHandler.createError(
-                    ErrorCode.PLUGIN_LOAD_FAILED,
-                    { plugin: pluginName, reason: 'Circular dependency detected' }
-                );
-            }
-
-            if (visited.has(pluginName)) return;
-
-            const config = this.plugins.get(pluginName);
-            if (!config || !config.enabled) return;
-
-            visiting.add(pluginName);
-
-            // Visit dependencies first
-            for (const dependency of config.dependencies || []) {
-                if (this.plugins.has(dependency)) {
-                    visit(dependency);
-                }
-            }
-
-            visiting.delete(pluginName);
-            visited.add(pluginName);
-            sorted.push(pluginName);
-        };
-
-        // Sort by priority first, then resolve dependencies
-        const enabledPlugins = Array.from(this.plugins.entries())
-            .filter(([_, config]) => config.enabled)
-            .sort(([, a], [, b]) => b.priority - a.priority)
-            .map(([name]) => name);
-
-        for (const pluginName of enabledPlugins) {
-            visit(pluginName);
-        }
-
-        this.loadOrder = sorted;
-    }
-
-    /**
-     * Get plugin configuration
-     */
-    public getPluginConfig(name: string): PluginConfigOptions | null {
-        return this.plugins.get(name) || null;
-    }
-
-    /**
-     * Set plugin configuration
-     */
-    public setPluginConfig(name: string, config: Partial<PluginConfigOptions>): void {
-        const existing = this.plugins.get(name) || PluginConfig.defaultConfig;
-        const merged = this.mergeConfig(existing, config);
-        this.plugins.set(name, merged);
-        this.calculateLoadOrder();
-    }
-
-    /**
-     * Enable/disable plugin
-     */
-    public setPluginEnabled(name: string, enabled: boolean): void {
-        const config = this.plugins.get(name);
-        if (config) {
-            config.enabled = enabled;
-            this.calculateLoadOrder();
-        }
-    }
-
-    /**
-     * Get plugins in load order
-     */
-    public getLoadOrder(): string[] {
-        return [...this.loadOrder];
-    }
-
-    /**
-     * Get enabled plugins
-     */
-    public getEnabledPlugins(): Map<string, PluginConfigOptions> {
-        const enabled = new Map<string, PluginConfigOptions>();
-        for (const [name, config] of this.plugins) {
-            if (config.enabled) {
-                enabled.set(name, config);
-            }
-        }
-        return enabled;
-    }
-
-    /**
-     * Validate plugin dependencies
-     */
-    public validateDependencies(): string[] {
-        const errors: string[] = [];
-
-        for (const [name, config] of this.plugins) {
-            if (!config.enabled) continue;
-
-            for (const dependency of config.dependencies || []) {
-                const depConfig = this.plugins.get(dependency);
-                if (!depConfig || !depConfig.enabled) {
-                    errors.push(`Plugin "${name}" requires "${dependency}" to be enabled`);
-                }
-            }
-        }
-
-        return errors;
-    }
-
-    /**
-     * Get plugin statistics
-     */
-    public getStats(): {
-        total: number;
-        enabled: number;
-        autoLoad: number;
-        builtin: number;
-        custom: number;
-    } {
-        let enabled = 0;
-        let autoLoad = 0;
-        let builtin = 0;
-        let custom = 0;
-
-        for (const [name, config] of this.plugins) {
-            if (config.enabled) enabled++;
-            if (config.autoLoad) autoLoad++;
-            if (PluginConfig.builtinPlugins[name]) {
-                builtin++;
-            } else {
-                custom++;
-            }
-        }
-
-        return {
-            total: this.plugins.size,
-            enabled,
-            autoLoad,
-            builtin,
-            custom
-        };
-    }
-
-    /**
-     * Export configuration to JSON
-     */
-    public exportConfig(): Record<string, PluginConfigOptions> {
-        const config: Record<string, PluginConfigOptions> = {};
-        for (const [name, pluginConfig] of this.plugins) {
-            config[name] = { ...pluginConfig };
-        }
-        return config;
-    }
-
-    /**
-     * Import configuration from JSON
-     */
-    public importConfig(config: Record<string, Partial<PluginConfigOptions>>): void {
-        this.plugins.clear();
-        this.initializePlugins(config);
-    }
-
-    /**
-     * Reset to default configuration
-     */
-    public reset(): void {
-        this.plugins.clear();
-        this.initializePlugins();
-    }
+    
+    return schema;
+  }
 }
