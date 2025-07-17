@@ -1,320 +1,314 @@
-# Kaza
+# Kaza - Advanced Discord Music Bot Library
 
-![Downloads](https://img.shields.io/npm/dm/kaza)
-![GitHub contributors](https://img.shields.io/github/contributors/ryanisnomore/Kaza)
-![GitHub release](https://img.shields.io/github/v/release/ryanisnomore/Kaza)
-![GitHub commit activity](https://img.shields.io/github/commit-activity/y/ryanisnomore/Kaza)
-![License](https://img.shields.io/github/license/ryanisnomore/Kaza)
-![TypeScript](https://img.shields.io/badge/language-Typescript-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.0-blue.svg)
+![Node.js](https://img.shields.io/badge/node-%3E%3D16.5.0-brightgreen.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.4.5-blue.svg)
+![License](https://img.shields.io/badge/license-ISC-green.svg)
 
----
+Kaza is a professional Discord music bot library built on top of Shoukaku, designed for modern multi-platform music streaming. It provides a robust foundation for building Discord music bots with intelligent search capabilities, comprehensive error handling, and advanced queue management.
 
-## 🚀 Latest Release
+## 🚀 Features
 
-**Version:** [3.3.0](https://github.com/ryanisnomore/Kaza/releases/tag/kaza)  
-**Published:** 2025-07-17
-
-**Release Notes:**
-✨ Key Features  
-🎯 Intelligent Platform Detection - Automatic URL parsing and platform recognition  
-🔍 Advanced Search Logic - Smart fallback engines and caching system  
-🛡️ Comprehensive Error Handling - Detailed error messages with recovery suggestions  
-🔧 Enhanced Plugin System - Configurable plugins with dependency management  
-📊 Health Monitoring - Real-time system health checks and statistics  
-⚡ Performance Optimized - Built-in caching, retry logic, and connection pooling  
-🌐 Multi-Platform Support - All platforms through LavaSrc configuration
-
----
-
-## 📦 About
-
-**Kaza** is a professional Discord music bot library built on top of [Shoukaku](https://github.com/Deivu/Shoukaku), fully rewritten for modern multi-platform music streaming. It features advanced queue management, intelligent multi-platform search, robust error handling, and full TypeScript support. Kaza is ideal for developers seeking a comprehensive, extensible, and high-performance solution for Discord music bots.
-
-> **Project Description:**  
-> _A Rewrite Kazagumo, A Shoukaku wrapper that has built-in queue system._
-
----
-
-## ✨ Key Features
-
-- **🎯 Intelligent Platform Detection:** Automatic URL parsing and platform recognition.
-- **🔍 Advanced Search Logic:** Smart fallback engines and intelligent caching system.
-- **🛡️ Comprehensive Error Handling:** Detailed error messages and recovery suggestions.
-- **🔧 Enhanced Plugin System:** Configurable plugins with dependency management.
-- **📊 Health Monitoring:** Real-time system health checks and statistics.
-- **⚡ Performance Optimized:** Built-in caching, retry logic, and connection pooling.
-- **🌐 Multi-Platform Support:** All platforms through LavaSrc configuration.
-
----
-
-## 🚀 Supported Platforms
-
-- **YouTube** & **YouTube Music**
-- **Spotify** (with credentials)
-- **Apple Music** (with credentials)
-- **Deezer** (with credentials)
-- **SoundCloud** (with credentials)
-- **JioSaavn** (no credentials required)
-- **Qobuz** (with credentials)
-- **Tidal** (with credentials)
-- **Bandcamp** (no credentials required)
-- **HTTP Streams**
-
----
+- **Multi-Platform Support**: YouTube, YouTube Music, Spotify, Apple Music, Deezer, SoundCloud, JioSaavn, Qobuz, Tidal, Bandcamp
+- **Dual Module Support**: Both CommonJS and ES Modules
+- **TypeScript Ready**: Full TypeScript definitions included
+- **Intelligent Search**: Smart platform detection and fallback engines
+- **Plugin System**: Extensible architecture with built-in plugins
+- **Error Handling**: Comprehensive error management with recovery suggestions
+- **URL Parsing**: Automatic platform detection from URLs
+- **Queue Management**: Advanced queue operations with shuffle, repeat, and track manipulation
+- **LavaSrc Compatible**: Works with LavaSrc 4.7.2+ for enhanced platform support
 
 ## 📦 Installation
 
 ```bash
 npm install kaza
-# or
-npm install git+https://github.com/ryanisnomore/Kaza.git
 ```
 
----
+## 🔧 Requirements
 
-## 🔧 Prerequisites
+- Node.js 16.5.0 or higher
+- A running Lavalink server
+- Discord.js 14.0.0 or higher
+- LavaSrc plugin (for multi-platform support)
 
-- **Lavalink Server** with **LavaSrc 4.7.2** plugin
-- **Discord.js v14+**
-- **Node.js 16.5.0+**
+## 🏗️ Quick Start
 
----
+### CommonJS Usage
 
-## 🚀 Quick Start
+```javascript
+const { Client, GatewayIntentBits } = require('discord.js');
+const { Connectors } = require('shoukaku');
+const { Kaza } = require('kaza');
+
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
+});
+
+const nodes = [{
+  name: 'Main',
+  url: 'localhost:2333',
+  auth: 'youshallnotpass',
+  secure: false
+}];
+
+const kaza = new Kaza({
+  defaultSearchEngine: 'ytsearch',
+  send: (guildId, payload) => {
+    const guild = client.guilds.cache.get(guildId);
+    if (guild) guild.shard.send(payload);
+  }
+}, new Connectors.DiscordJS(client), nodes);
+
+client.on('ready', () => {
+  console.log(`${client.user.tag} is ready!`);
+});
+
+client.on('messageCreate', async (message) => {
+  if (message.content.startsWith('!play ')) {
+    const query = message.content.slice(6);
+    
+    // Create or get player
+    const player = await kaza.createPlayer({
+      guildId: message.guild.id,
+      voiceId: message.member.voice.channel.id,
+      textId: message.channel.id
+    });
+    
+    // Search for tracks
+    const result = await kaza.search(query, {
+      requester: message.author
+    });
+    
+    if (result.tracks.length) {
+      player.queue.add(result.tracks[0]);
+      if (!player.playing) await player.play();
+      
+      message.reply(`Added: ${result.tracks[0].info.title}`);
+    }
+  }
+});
+
+client.login('YOUR_BOT_TOKEN');
+```
+
+### ES Module Usage
+
+```javascript
+import { Client, GatewayIntentBits } from 'discord.js';
+import { Connectors } from 'shoukaku';
+import { Kaza } from 'kaza';
+
+// Same implementation as above but with ES imports
+```
+
+### TypeScript Usage
 
 ```typescript
 import { Client, GatewayIntentBits } from 'discord.js';
 import { Connectors } from 'shoukaku';
-import { Kaza, PlayerMoved } from 'kaza';
+import { Kaza, KazagumoPlayer, KazagumoTrack } from 'kaza';
 
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
 });
 
-const nodes = [{
-    name: 'Main',
-    url: 'localhost:2333',
-    auth: 'youshallnotpass',
-    secure: false
-}];
+// Full type safety with TypeScript definitions
+```
 
+## 🎵 Platform Support
+
+Kaza supports the following music platforms through LavaSrc:
+
+| Platform | Search Engine | URL Support | Playlist Support |
+|----------|---------------|-------------|------------------|
+| YouTube | `ytsearch` | ✅ | ✅ |
+| YouTube Music | `ytmsearch` | ✅ | ✅ |
+| Spotify | `spsearch` | ✅ | ✅ |
+| Apple Music | `amsearch` | ✅ | ✅ |
+| Deezer | `dzsearch` | ✅ | ✅ |
+| SoundCloud | `scsearch` | ✅ | ✅ |
+| JioSaavn | `jiosaavn` | ✅ | ❌ |
+| Qobuz | `qobuz` | ✅ | ❌ |
+| Tidal | `tidal` | ✅ | ✅ |
+| Bandcamp | `bandcamp` | ✅ | ❌ |
+
+## 🔌 Advanced Configuration
+
+```javascript
 const kaza = new Kaza({
-    defaultSearchEngine: 'ytsearch',
-    send: (guildId, payload) => {
-        const guild = client.guilds.cache.get(guildId);
-        if (guild) guild.shard.send(payload);
-    },
-    plugins: {
-        'PlayerMoved': { enabled: true }
+  defaultSearchEngine: 'ytsearch',
+  send: (guildId, payload) => {
+    const guild = client.guilds.cache.get(guildId);
+    if (guild) guild.shard.send(payload);
+  },
+  plugins: {
+    PlayerMoved: {
+      enabled: true,
+      config: {
+        autoReconnect: true,
+        reconnectDelay: 1000,
+        maxReconnectAttempts: 3
+      }
     }
-}, new Connectors.DiscordJS(client), nodes);
-
-client.on('messageCreate', async (message) => {
-    if (message.content === '!play despacito') {
-        const player = kaza.createPlayer({
-            guildId: message.guild.id,
-            voiceId: message.member.voice.channel.id,
-            textId: message.channel.id
-        });
-
-        const result = await kaza.autoSearch('despacito', {
-            requester: message.author,
-            fallbackEngines: ['ytmsearch', 'spsearch']
-        });
-
-        if (result.tracks.length) {
-            player.queue.add(result.tracks[0]);
-            if (!player.playing) player.play();
-        }
-    }
-});
-
-client.login('your-bot-token');
-```
-
----
-
-## 🎯 Advanced Usage
-
-### Smart URL Detection
-
-```typescript
-// Detect platform and optimal search method
-const spotifyResult = await kaza.autoSearch('https://open.spotify.com/track/...');
-const appleResult = await kaza.autoSearch('https://music.apple.com/...');
-const youtubeResult = await kaza.autoSearch('https://youtube.com/watch?v=...');
-
-// Get URL information
-const urlInfo = kaza.parseURL('https://open.spotify.com/track/...');
-console.log(urlInfo.platform); // 'spotify'
-console.log(urlInfo.type); // 'track'
-```
-
-### Enhanced Search Options
-
-```typescript
-const result = await kaza.search('my favorite song', {
-    requester: message.author,
-    limit: 5,
-    timeout: 15000,
-    fallbackEngines: ['ytmsearch', 'spsearch', 'ytsearch'],
+  },
+  searchOptions: {
+    cacheResults: true,
+    cacheTTL: 300000, // 5 minutes
     retryAttempts: 3,
-    cacheResults: true
+    fallbackEngines: ['ytsearch', 'scsearch']
+  }
+}, new Connectors.DiscordJS(client), nodes);
+```
+
+## 🎯 API Reference
+
+### Main Classes
+
+- **Kaza/Kazagumo**: Main class for managing the music system
+- **KazagumoPlayer**: Individual guild player with queue management
+- **KazagumoQueue**: Advanced queue with shuffle, repeat, and manipulation
+- **EnhancedSearchManager**: Intelligent search with platform detection
+- **URLParser**: URL parsing and platform detection
+- **ErrorHandler**: Comprehensive error management
+
+### Search Methods
+
+```javascript
+// Basic search
+const result = await kaza.search('Never Gonna Give You Up');
+
+// Platform-specific search
+const result = await kaza.search('spotify:track:4iV5W9uYEdYUVa79Axb7Rh');
+
+// Search with options
+const result = await kaza.search('Epic song', {
+  source: 'spotify',
+  limit: 5,
+  requester: user
 });
+
+// Search with fallback
+const result = await kaza.searchWithFallback('Rare song');
 ```
 
-### Platform-Specific Searches
+### Player Management
 
-```typescript
-const spotifyTracks = await kaza.searchSpotify('artist - song');
-const appleTracks = await kaza.searchAppleMusic('album name');
-const youtubeTracks = await kaza.searchYouTube('music video');
+```javascript
+// Create player
+const player = await kaza.createPlayer({
+  guildId: '123456789',
+  voiceId: '987654321',
+  textId: '456789123'
+});
+
+// Player controls
+await player.play(track);
+await player.pause(true);
+await player.stop();
+await player.setVolume(50);
+await player.seek(30000); // 30 seconds
+
+// Queue operations
+player.queue.add(tracks);
+player.queue.remove(0);
+player.queue.shuffle();
+player.queue.clear();
 ```
 
-### Error Handling
+## 🔧 Error Handling
 
-```typescript
+Kaza provides comprehensive error handling with recovery suggestions:
+
+```javascript
 try {
-    const result = await kaza.search('invalid query');
+  const result = await kaza.search('invalid query');
 } catch (error) {
-    if (kaza.isKazaError(error)) {
-        console.log('Error code:', error.code);
-        console.log('Suggestions:', error.suggestions);
-        console.log('Recoverable:', error.recoverable);
-    }
+  console.log('Error code:', error.code);
+  console.log('Recoverable:', error.recoverable);
+  console.log('Suggestions:', error.suggestions);
 }
 ```
 
-### Health Monitoring
+## 🧩 Plugin System
 
-```typescript
-const health = await kaza.healthCheck();
-console.log('Status:', health.status); // 'healthy', 'degraded', or 'unhealthy'
-console.log('Components:', health.components);
+Kaza supports a powerful plugin system:
 
-const stats = kaza.getStats();
-console.log('Players:', stats.players);
-console.log('Search cache hit rate:', stats.search.cacheHitRate);
-console.log('Supported platforms:', stats.search.supportedPlatforms);
+```javascript
+// Built-in PlayerMoved plugin
+kaza.on('playerMoved', (player, oldChannel, newChannel) => {
+  console.log(`Player moved from ${oldChannel} to ${newChannel}`);
+});
+
+// Create custom plugins
+class CustomPlugin {
+  metadata = {
+    name: 'CustomPlugin',
+    version: '1.0.0',
+    description: 'My custom plugin',
+    author: 'Developer'
+  };
+
+  async initialize(kazagumo) {
+    // Plugin initialization
+  }
+
+  async destroy() {
+    // Plugin cleanup
+  }
+}
 ```
 
-### Plugin Configuration
+## 📝 Examples
 
-```typescript
-const kaza = new Kaza({
-    plugins: {
-        'PlayerMoved': { 
-            enabled: true, 
-            priority: 100,
-            config: { autoReconnect: true }
-        },
-        'AutoLeave': { 
-            enabled: true,
-            config: { emptyChannelTimeout: 300000 }
-        }
-    }
-}, connector, nodes);
+Check the `example/` directory for comprehensive usage examples:
+
+- `basic-usage.js`: Basic CommonJS implementation
+- `advanced-usage.js`: Advanced features and configuration
+- `typescript-usage.ts`: TypeScript implementation
+- `test-compilation.js`: Library functionality test
+
+## 🛠️ Development
+
+```bash
+# Install dependencies
+npm install
+
+# Build the library
+npm run build
+
+# Run tests
+node example/test-compilation.js
+
+# Test ES modules
+node example/test-esm.mjs
 ```
 
----
-
-## 🔌 Built-in Plugins
-
-- **PlayerMoved** — Handles voice channel changes
-- **AutoLeave** — Leaves empty channels automatically
-- **QueueSaver** — Saves queues on shutdown
-- **VolumeNormalizer** — Normalizes audio levels
-- **CrossFade** — Smooth track transitions
-
----
-
-## ⚙️ Lavalink Configuration
-
-Add this to your Lavalink `application.yml`:
-
-```yaml
-lavalink:
-  plugins:
-    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.7.2"
-      repository: "https://jitpack.io"
-
-plugins:
-  lavasrc:
-    providers:
-      - "ytmsearch:%ISRC%"
-      - "ytmsearch:%QUERY%"
-      - "spsearch:%QUERY%"
-      - "amsearch:%QUERY%"
-      - "dzsearch:%QUERY%"
-      - "scsearch:%QUERY%"
-      - "jiosaavn:%QUERY%"
-      - "qobuz:%QUERY%"
-      - "tidal:%QUERY%"
-      - "bandcamp:%QUERY%"
-    
-    spotify:
-      clientId: "your_spotify_client_id"
-      clientSecret: "your_spotify_client_secret"
-    
-    applemusic:
-      countryCode: "US"
-      mediaAPIToken: "your_apple_music_token"
-```
-
----
-
-## 📊 Performance Features
-
-- **Intelligent Caching:** Automatic result caching with TTL
-- **Connection Pooling:** Efficient node management
-- **Retry Logic:** Exponential backoff for failed requests
-- **Fallback Engines:** Automatic fallback to alternative sources
-- **Health Monitoring:** Real-time system health tracking
-
----
-
-## 🛠️ API Reference
-
-### Core Classes
-
-- **Kaza** — Main library class
-- **KazagumoPlayer** — Individual guild music player
-- **KazagumoQueue** — Advanced queue management
-- **SearchManager** — Intelligent search handling
-
-### Utilities
-
-- **URLParser** — URL detection and platform identification
-- **ErrorHandler** — Comprehensive error management
-- **PluginConfig** — Plugin configuration and management
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please open an issue or submit a pull request.  
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
-
----
-
-## 📜 License
+## 📄 License
 
 This project is licensed under the ISC License.
 
----
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 🔗 Links
 
-- **Documentation:** [API Docs (Coming Soon)](https://discord.gg/W2GheK3F9m)
-- **Examples:** [Usage Examples](./example)
-- **Discord:** [Support Server](https://discord.gg/W2GheK3F9m)
-- **Latest Release:** [v3.3.0](https://github.com/ryanisnomore/Kaza/releases/tag/kaza)
+- [Shoukaku](https://github.com/Deivu/Shoukaku) - Lavalink client
+- [LavaSrc](https://github.com/topi314/LavaSrc) - Multi-platform source plugin
+- [Discord.js](https://discord.js.org/) - Discord API library
+- [Lavalink](https://github.com/lavalink-devs/Lavalink) - Audio delivery server
 
 ---
 
-**Kaza** — Making Discord music bots smarter, one search at a time. 🎵
+Built with ❤️ for the Discord music bot community
