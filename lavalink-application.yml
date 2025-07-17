@@ -1,0 +1,140 @@
+# Lavalink Server Configuration with LavaSrc 4.7.2
+# Place this file in your Lavalink server directory
+
+server:
+  port: 2333
+  address: 0.0.0.0
+
+spring:
+  main:
+    banner-mode: log
+  profiles:
+    active: "default"
+
+lavalink:
+  plugins:
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.7.2"
+      repository: "https://jitpack.io"
+  server:
+    password: "youshallnotpass"
+    sources:
+      youtube: true
+      bandcamp: true
+      soundcloud: true
+      twitch: true
+      vimeo: true
+      http: true
+      local: false
+    filters:
+      volume: true
+      equalizer: true
+      karaoke: true
+      timescale: true
+      tremolo: true
+      vibrato: true
+      distortion: true
+      rotation: true
+      channelMix: true
+      lowPass: true
+
+# LavaSrc 4.7.2 Configuration
+plugins:
+  lavasrc:
+    providers:
+      # YouTube Music
+      - "ytmsearch:%ISRC%"
+      - "ytmsearch:%QUERY%"
+      
+      # Spotify (requires Spotify API credentials)
+      - "spsearch:%QUERY%"
+      
+      # Apple Music (requires Apple Music API token)
+      - "amsearch:%QUERY%"
+      
+      # Deezer (requires Deezer master key)
+      - "dzsearch:%QUERY%"
+      
+      # SoundCloud (requires SoundCloud client ID)
+      - "scsearch:%QUERY%"
+      
+      # JioSaavn (no credentials required)
+      - "jiosaavn:%QUERY%"
+      
+      # Qobuz (requires Qobuz credentials)
+      - "qobuz:%QUERY%"
+      
+      # Tidal (requires Tidal credentials)
+      - "tidal:%QUERY%"
+      
+      # Bandcamp (no credentials required)
+      - "bandcamp:%QUERY%"
+      
+      # Flowery TTS (requires Flowery API key)
+      - "flowery:%QUERY%"
+
+    sources:
+      # Spotify Configuration
+      spotify:
+        clientId: "YOUR_SPOTIFY_CLIENT_ID"
+        clientSecret: "YOUR_SPOTIFY_CLIENT_SECRET"
+        countryCode: "US"
+        playlistLoadLimit: 6
+        albumLoadLimit: 6
+
+      # Apple Music Configuration
+      applemusic:
+        countryCode: "US"
+        mediaAPIToken: "YOUR_APPLE_MUSIC_TOKEN"
+        playlistLoadLimit: 6
+        albumLoadLimit: 6
+
+      # Deezer Configuration
+      deezer:
+        masterDecryptionKey: "YOUR_DEEZER_MASTER_KEY"
+        arl: "YOUR_DEEZER_ARL"
+
+      # JioSaavn Configuration
+      jiosaavn:
+        countryCode: "IN"
+
+      # SoundCloud Configuration
+      soundcloud:
+        clientId: "YOUR_SOUNDCLOUD_CLIENT_ID"
+        oauthToken: "YOUR_SOUNDCLOUD_OAUTH_TOKEN"
+
+      # Qobuz Configuration
+      qobuz:
+        appId: "YOUR_QOBUZ_APP_ID"
+        secret: "YOUR_QOBUZ_SECRET"
+
+      # Tidal Configuration
+      tidal:
+        countryCode: "US"
+        token: "YOUR_TIDAL_TOKEN"
+
+      # Flowery TTS Configuration
+      flowery:
+        voice: "default"
+
+logging:
+  file:
+    path: ./logs/
+  level:
+    root: INFO
+    lavalink: INFO
+  logback:
+    rollingpolicy:
+      max-file-size: 1GB
+      max-history: 30
+
+metrics:
+  prometheus:
+    enabled: false
+    endpoint: /metrics
+
+sentry:
+  dsn: ""
+  environment: ""
+
+# Optional: Configure multiple nodes for load balancing
+# Copy this configuration to multiple servers with different ports
