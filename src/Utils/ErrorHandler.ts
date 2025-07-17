@@ -1,253 +1,389 @@
 /**
- * Comprehensive error handling system for Kaza
+ * ErrorHandler - Comprehensive error handling with recovery suggestions
  */
 
+import { KazagumoError } from '../types';
+
 export enum ErrorCode {
-    // Connection Errors
-    CONNECTION_FAILED = 'CONNECTION_FAILED',
-    NODE_UNAVAILABLE = 'NODE_UNAVAILABLE',
-    LAVALINK_ERROR = 'LAVALINK_ERROR',
-    
-    // Player Errors
-    PLAYER_NOT_FOUND = 'PLAYER_NOT_FOUND',
-    VOICE_CONNECTION_FAILED = 'VOICE_CONNECTION_FAILED',
-    TRACK_FAILED = 'TRACK_FAILED',
-    
-    // Search Errors
-    NO_RESULTS = 'NO_RESULTS',
-    SEARCH_FAILED = 'SEARCH_FAILED',
-    INVALID_URL = 'INVALID_URL',
-    PLATFORM_UNAVAILABLE = 'PLATFORM_UNAVAILABLE',
-    
-    // Configuration Errors
-    MISSING_CREDENTIALS = 'MISSING_CREDENTIALS',
-    INVALID_CONFIG = 'INVALID_CONFIG',
-    PLUGIN_LOAD_FAILED = 'PLUGIN_LOAD_FAILED',
-    
-    // Queue Errors
-    QUEUE_EMPTY = 'QUEUE_EMPTY',
-    TRACK_NOT_FOUND = 'TRACK_NOT_FOUND',
-    INVALID_INDEX = 'INVALID_INDEX',
-    
-    // General Errors
-    UNKNOWN_ERROR = 'UNKNOWN_ERROR',
-    TIMEOUT = 'TIMEOUT',
-    RATE_LIMITED = 'RATE_LIMITED'
+  // Search errors
+  SEARCH_FAILED = 'SEARCH_FAILED',
+  SEARCH_NO_RESULTS = 'SEARCH_NO_RESULTS',
+  SEARCH_TIMEOUT = 'SEARCH_TIMEOUT',
+  INVALID_QUERY = 'INVALID_QUERY',
+  
+  // URL errors
+  INVALID_URL = 'INVALID_URL',
+  URL_NOT_ACCESSIBLE = 'URL_NOT_ACCESSIBLE',
+  
+  // Platform errors
+  PLATFORM_NOT_SUPPORTED = 'PLATFORM_NOT_SUPPORTED',
+  PLATFORM_UNAVAILABLE = 'PLATFORM_UNAVAILABLE',
+  PLATFORM_RATE_LIMITED = 'PLATFORM_RATE_LIMITED',
+  
+  // Player errors
+  PLAYER_NOT_FOUND = 'PLAYER_NOT_FOUND',
+  PLAYER_NOT_CONNECTED = 'PLAYER_NOT_CONNECTED',
+  PLAYER_ALREADY_EXISTS = 'PLAYER_ALREADY_EXISTS',
+  VOICE_CHANNEL_NOT_FOUND = 'VOICE_CHANNEL_NOT_FOUND',
+  VOICE_PERMISSIONS_MISSING = 'VOICE_PERMISSIONS_MISSING',
+  
+  // Queue errors
+  QUEUE_EMPTY = 'QUEUE_EMPTY',
+  QUEUE_FULL = 'QUEUE_FULL',
+  TRACK_NOT_FOUND = 'TRACK_NOT_FOUND',
+  INVALID_TRACK_INDEX = 'INVALID_TRACK_INDEX',
+  
+  // Node errors
+  NODE_NOT_AVAILABLE = 'NODE_NOT_AVAILABLE',
+  NODE_CONNECTION_FAILED = 'NODE_CONNECTION_FAILED',
+  NODE_DISCONNECTED = 'NODE_DISCONNECTED',
+  
+  // Plugin errors
+  PLUGIN_NOT_FOUND = 'PLUGIN_NOT_FOUND',
+  PLUGIN_INITIALIZATION_ERROR = 'PLUGIN_INITIALIZATION_ERROR',
+  PLUGIN_EXECUTION_ERROR = 'PLUGIN_EXECUTION_ERROR',
+  
+  // Configuration errors
+  INVALID_CONFIGURATION = 'INVALID_CONFIGURATION',
+  MISSING_CREDENTIALS = 'MISSING_CREDENTIALS',
+  
+  // General errors
+  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
+  NETWORK_ERROR = 'NETWORK_ERROR',
+  TIMEOUT_ERROR = 'TIMEOUT_ERROR',
+  PERMISSION_DENIED = 'PERMISSION_DENIED'
 }
 
-export interface KazaError {
-    code: ErrorCode;
-    message: string;
-    details?: any;
-    timestamp: Date;
-    recoverable: boolean;
-    suggestions?: string[];
+interface ErrorInfo {
+  code: ErrorCode;
+  message: string;
+  recoverable: boolean;
+  suggestions: string[];
+  severity: 'low' | 'medium' | 'high' | 'critical';
 }
 
 export class ErrorHandler {
-    private static readonly errorMessages: Record<ErrorCode, string> = {
-        [ErrorCode.CONNECTION_FAILED]: 'Failed to connect to Lavalink server',
-        [ErrorCode.NODE_UNAVAILABLE]: 'No available Lavalink nodes',
-        [ErrorCode.LAVALINK_ERROR]: 'Lavalink server encountered an error',
-        [ErrorCode.PLAYER_NOT_FOUND]: 'Music player not found for this server',
-        [ErrorCode.VOICE_CONNECTION_FAILED]: 'Failed to connect to voice channel',
-        [ErrorCode.TRACK_FAILED]: 'Track playback failed',
-        [ErrorCode.NO_RESULTS]: 'No search results found',
-        [ErrorCode.SEARCH_FAILED]: 'Search request failed',
-        [ErrorCode.INVALID_URL]: 'Invalid or unsupported URL format',
-        [ErrorCode.PLATFORM_UNAVAILABLE]: 'Platform not available or configured',
-        [ErrorCode.MISSING_CREDENTIALS]: 'Missing required API credentials',
-        [ErrorCode.INVALID_CONFIG]: 'Invalid configuration provided',
-        [ErrorCode.PLUGIN_LOAD_FAILED]: 'Failed to load plugin',
-        [ErrorCode.QUEUE_EMPTY]: 'Queue is empty',
-        [ErrorCode.TRACK_NOT_FOUND]: 'Track not found in queue',
-        [ErrorCode.INVALID_INDEX]: 'Invalid queue index',
-        [ErrorCode.UNKNOWN_ERROR]: 'An unknown error occurred',
-        [ErrorCode.TIMEOUT]: 'Operation timed out',
-        [ErrorCode.RATE_LIMITED]: 'Rate limited by service'
+  private readonly errorDatabase: Map<ErrorCode, Partial<ErrorInfo>> = new Map([
+    [ErrorCode.SEARCH_FAILED, {
+      recoverable: true,
+      suggestions: [
+        'Check your internet connection',
+        'Verify Lavalink server is running',
+        'Try a different search query',
+        'Check if the platform is supported'
+      ],
+      severity: 'medium'
+    }],
+    [ErrorCode.SEARCH_NO_RESULTS, {
+      recoverable: true,
+      suggestions: [
+        'Try different keywords',
+        'Check spelling of your search query',
+        'Try searching on a different platform',
+        'Use more specific search terms'
+      ],
+      severity: 'low'
+    }],
+    [ErrorCode.SEARCH_TIMEOUT, {
+      recoverable: true,
+      suggestions: [
+        'Check your internet connection',
+        'Verify Lavalink server response time',
+        'Try again later',
+        'Consider increasing timeout value'
+      ],
+      severity: 'medium'
+    }],
+    [ErrorCode.INVALID_URL, {
+      recoverable: false,
+      suggestions: [
+        'Check URL format',
+        'Ensure URL is from a supported platform',
+        'Remove any tracking parameters',
+        'Verify URL is accessible'
+      ],
+      severity: 'low'
+    }],
+    [ErrorCode.PLATFORM_NOT_SUPPORTED, {
+      recoverable: false,
+      suggestions: [
+        'Check list of supported platforms',
+        'Enable platform in configuration',
+        'Request platform support from developers',
+        'Use alternative platform'
+      ],
+      severity: 'low'
+    }],
+    [ErrorCode.PLAYER_NOT_FOUND, {
+      recoverable: true,
+      suggestions: [
+        'Create a new player first',
+        'Check if player was destroyed',
+        'Verify guild ID is correct',
+        'Use createPlayer() method'
+      ],
+      severity: 'medium'
+    }],
+    [ErrorCode.PLAYER_NOT_CONNECTED, {
+      recoverable: true,
+      suggestions: [
+        'Join a voice channel first',
+        'Check voice channel permissions',
+        'Verify bot has voice permissions',
+        'Try reconnecting to voice channel'
+      ],
+      severity: 'medium'
+    }],
+    [ErrorCode.VOICE_PERMISSIONS_MISSING, {
+      recoverable: true,
+      suggestions: [
+        'Grant bot voice permissions',
+        'Check role hierarchy',
+        'Verify channel permissions',
+        'Contact server administrator'
+      ],
+      severity: 'high'
+    }],
+    [ErrorCode.QUEUE_EMPTY, {
+      recoverable: true,
+      suggestions: [
+        'Add tracks to queue first',
+        'Search for music',
+        'Check if queue was cleared',
+        'Use search commands'
+      ],
+      severity: 'low'
+    }],
+    [ErrorCode.NODE_NOT_AVAILABLE, {
+      recoverable: true,
+      suggestions: [
+        'Check Lavalink server status',
+        'Verify node configuration',
+        'Restart Lavalink server',
+        'Check network connectivity'
+      ],
+      severity: 'critical'
+    }],
+    [ErrorCode.NODE_CONNECTION_FAILED, {
+      recoverable: true,
+      suggestions: [
+        'Check Lavalink server address',
+        'Verify authentication credentials',
+        'Check firewall settings',
+        'Ensure Lavalink server is running'
+      ],
+      severity: 'critical'
+    }],
+    [ErrorCode.PLUGIN_INITIALIZATION_ERROR, {
+      recoverable: true,
+      suggestions: [
+        'Check plugin configuration',
+        'Verify plugin dependencies',
+        'Update plugin version',
+        'Disable problematic plugins'
+      ],
+      severity: 'medium'
+    }],
+    [ErrorCode.MISSING_CREDENTIALS, {
+      recoverable: true,
+      suggestions: [
+        'Add required API credentials',
+        'Check environment variables',
+        'Verify credential format',
+        'Contact platform for API access'
+      ],
+      severity: 'high'
+    }]
+  ]);
+
+  /**
+   * Create a detailed Kazagumo error
+   */
+  public createError(
+    code: ErrorCode,
+    message: string,
+    recoverable: boolean = true,
+    suggestions: string[] = []
+  ): KazagumoError {
+    const errorInfo = this.errorDatabase.get(code) || {};
+    
+    const error = new Error(message) as KazagumoError;
+    error.code = code;
+    error.recoverable = recoverable;
+    error.suggestions = suggestions.length > 0 ? suggestions : (errorInfo.suggestions || []);
+    error.name = 'KazagumoError';
+    
+    return error;
+  }
+
+  /**
+   * Handle and log errors with context
+   */
+  public handleError(error: Error, context?: string): void {
+    const errorContext = context ? `[${context}] ` : '';
+    
+    if (this.isKazagumoError(error)) {
+      console.error(`${errorContext}Kazagumo Error [${error.code}]: ${error.message}`);
+      
+      if (error.suggestions && error.suggestions.length > 0) {
+        console.error('Suggestions:');
+        error.suggestions.forEach((suggestion, index) => {
+          console.error(`  ${index + 1}. ${suggestion}`);
+        });
+      }
+      
+      if (error.recoverable) {
+        console.error('This error is recoverable. Please try the suggested solutions.');
+      } else {
+        console.error('This error is not recoverable. Manual intervention required.');
+      }
+    } else {
+      console.error(`${errorContext}Unexpected Error: ${error.message}`);
+      console.error(error.stack);
+    }
+  }
+
+  /**
+   * Check if error is a Kazagumo error
+   */
+  public isKazagumoError(error: any): error is KazagumoError {
+    return error && 
+           typeof error.code === 'string' && 
+           typeof error.recoverable === 'boolean' &&
+           error.name === 'KazagumoError';
+  }
+
+  /**
+   * Get error severity
+   */
+  public getErrorSeverity(code: ErrorCode): 'low' | 'medium' | 'high' | 'critical' {
+    const errorInfo = this.errorDatabase.get(code);
+    return errorInfo?.severity || 'medium';
+  }
+
+  /**
+   * Get error suggestions
+   */
+  public getErrorSuggestions(code: ErrorCode): string[] {
+    const errorInfo = this.errorDatabase.get(code);
+    return errorInfo?.suggestions || [];
+  }
+
+  /**
+   * Check if error is recoverable
+   */
+  public isRecoverable(code: ErrorCode): boolean {
+    const errorInfo = this.errorDatabase.get(code);
+    return errorInfo?.recoverable !== false;
+  }
+
+  /**
+   * Create network error
+   */
+  public createNetworkError(message: string, originalError?: Error): KazagumoError {
+    const error = this.createError(
+      ErrorCode.NETWORK_ERROR,
+      `Network error: ${message}`,
+      true,
+      [
+        'Check internet connection',
+        'Verify firewall settings',
+        'Try again later',
+        'Contact network administrator'
+      ]
+    );
+
+    if (originalError) {
+      error.stack = originalError.stack || '';
+    }
+
+    return error;
+  }
+
+  /**
+   * Create timeout error
+   */
+  public createTimeoutError(operation: string, timeout: number): KazagumoError {
+    return this.createError(
+      ErrorCode.TIMEOUT_ERROR,
+      `Operation '${operation}' timed out after ${timeout}ms`,
+      true,
+      [
+        'Increase timeout value',
+        'Check network connection',
+        'Try again later',
+        'Verify server responsiveness'
+      ]
+    );
+  }
+
+  /**
+   * Create permission error
+   */
+  public createPermissionError(permission: string, context?: string): KazagumoError {
+    const contextMsg = context ? ` in ${context}` : '';
+    return this.createError(
+      ErrorCode.PERMISSION_DENIED,
+      `Missing permission: ${permission}${contextMsg}`,
+      true,
+      [
+        `Grant ${permission} permission`,
+        'Check role hierarchy',
+        'Verify bot permissions',
+        'Contact server administrator'
+      ]
+    );
+  }
+
+  /**
+   * Wrap unknown errors
+   */
+  public wrapUnknownError(error: Error, context?: string): KazagumoError {
+    const contextMsg = context ? ` in ${context}` : '';
+    return this.createError(
+      ErrorCode.UNKNOWN_ERROR,
+      `Unknown error${contextMsg}: ${error.message}`,
+      true,
+      [
+        'Check error details',
+        'Report to developers',
+        'Try restarting the application',
+        'Check system resources'
+      ]
+    );
+  }
+
+  /**
+   * Format error for user display
+   */
+  public formatErrorForUser(error: KazagumoError): string {
+    let message = `**Error:** ${error.message}\n`;
+    
+    if (error.suggestions && error.suggestions.length > 0) {
+      message += `**Suggestions:**\n`;
+      error.suggestions.forEach((suggestion, index) => {
+        message += `${index + 1}. ${suggestion}\n`;
+      });
+    }
+    
+    return message.trim();
+  }
+
+  /**
+   * Get error statistics
+   */
+  public getErrorStats(): {
+    totalErrors: number;
+    recoverableErrors: number;
+    criticalErrors: number;
+    errorsByCode: Record<string, number>;
+  } {
+    // This would be implemented with actual error tracking
+    return {
+      totalErrors: 0,
+      recoverableErrors: 0,
+      criticalErrors: 0,
+      errorsByCode: {}
     };
-
-    private static readonly recoverableCodes: Set<ErrorCode> = new Set([
-        ErrorCode.NO_RESULTS,
-        ErrorCode.SEARCH_FAILED,
-        ErrorCode.TRACK_FAILED,
-        ErrorCode.TIMEOUT,
-        ErrorCode.RATE_LIMITED,
-        ErrorCode.QUEUE_EMPTY,
-        ErrorCode.TRACK_NOT_FOUND,
-        ErrorCode.INVALID_INDEX
-    ]);
-
-    private static readonly errorSuggestions: Partial<Record<ErrorCode, string[]>> = {
-        [ErrorCode.CONNECTION_FAILED]: [
-            'Check if Lavalink server is running',
-            'Verify server address and port',
-            'Check firewall settings'
-        ],
-        [ErrorCode.NODE_UNAVAILABLE]: [
-            'Add more Lavalink nodes',
-            'Check node health status',
-            'Verify node configuration'
-        ],
-        [ErrorCode.PLATFORM_UNAVAILABLE]: [
-            'Configure LavaSrc plugin in Lavalink',
-            'Add required API credentials',
-            'Check platform-specific settings'
-        ],
-        [ErrorCode.MISSING_CREDENTIALS]: [
-            'Add API keys to Lavalink configuration',
-            'Verify credential validity',
-            'Check credential permissions'
-        ],
-        [ErrorCode.INVALID_URL]: [
-            'Check URL format',
-            'Ensure platform is supported',
-            'Try a different URL from the platform'
-        ],
-        [ErrorCode.VOICE_CONNECTION_FAILED]: [
-            'Check bot permissions in voice channel',
-            'Verify user is in a voice channel',
-            'Try rejoining the voice channel'
-        ],
-        [ErrorCode.NO_RESULTS]: [
-            'Try a different search term',
-            'Check spelling and formatting',
-            'Use platform-specific search'
-        ]
-    };
-
-    /**
-     * Create a standardized error object
-     */
-    public static createError(
-        code: ErrorCode,
-        details?: any,
-        customMessage?: string
-    ): KazaError {
-        return {
-            code,
-            message: customMessage || this.errorMessages[code],
-            details,
-            timestamp: new Date(),
-            recoverable: this.recoverableCodes.has(code),
-            suggestions: this.errorSuggestions[code] || []
-        };
-    }
-
-    /**
-     * Handle and format errors for user display
-     */
-    public static formatError(error: KazaError | Error | any): string {
-        if (error instanceof Error) {
-            return `Error: ${error.message}`;
-        }
-
-        if (this.isKazaError(error)) {
-            let message = `[${error.code}] ${error.message}`;
-            
-            if (error.suggestions && error.suggestions.length > 0) {
-                message += '\n\nSuggestions:\n• ' + error.suggestions.join('\n• ');
-            }
-
-            return message;
-        }
-
-        return `Unknown error: ${String(error)}`;
-    }
-
-    /**
-     * Check if error is a KazaError
-     */
-    public static isKazaError(error: any): error is KazaError {
-        return error && 
-               typeof error.code === 'string' && 
-               typeof error.message === 'string' && 
-               error.timestamp instanceof Date;
-    }
-
-    /**
-     * Log error with appropriate level
-     */
-    public static logError(error: KazaError | Error | any, context?: string): void {
-        const prefix = context ? `[${context}]` : '[Kaza]';
-        
-        if (this.isKazaError(error)) {
-            const level = error.recoverable ? 'warn' : 'error';
-            console[level](`${prefix} ${error.code}: ${error.message}`, error.details);
-        } else if (error instanceof Error) {
-            console.error(`${prefix} ${error.name}: ${error.message}`, error.stack);
-        } else {
-            console.error(`${prefix} Unknown error:`, error);
-        }
-    }
-
-    /**
-     * Wrap async operations with error handling
-     */
-    public static async handleAsync<T>(
-        operation: () => Promise<T>,
-        fallbackCode: ErrorCode,
-        context?: string
-    ): Promise<T> {
-        try {
-            return await operation();
-        } catch (error) {
-            const kazaError = error instanceof Error 
-                ? this.createError(fallbackCode, { originalError: error.message })
-                : this.createError(fallbackCode, { error });
-            
-            this.logError(kazaError, context);
-            throw kazaError;
-        }
-    }
-
-    /**
-     * Create timeout wrapper for operations
-     */
-    public static withTimeout<T>(
-        promise: Promise<T>,
-        timeoutMs: number,
-        timeoutCode: ErrorCode = ErrorCode.TIMEOUT
-    ): Promise<T> {
-        return Promise.race([
-            promise,
-            new Promise<never>((_, reject) => {
-                setTimeout(() => {
-                    reject(this.createError(timeoutCode, { timeout: timeoutMs }));
-                }, timeoutMs);
-            })
-        ]);
-    }
-
-    /**
-     * Retry logic with exponential backoff
-     */
-    public static async retry<T>(
-        operation: () => Promise<T>,
-        maxRetries: number = 3,
-        baseDelay: number = 1000,
-        retryableErrors: ErrorCode[] = [ErrorCode.TIMEOUT, ErrorCode.CONNECTION_FAILED]
-    ): Promise<T> {
-        let lastError: any;
-
-        for (let attempt = 0; attempt <= maxRetries; attempt++) {
-            try {
-                return await operation();
-            } catch (error) {
-                lastError = error;
-
-                if (attempt === maxRetries) break;
-
-                const isRetryable = this.isKazaError(error) && 
-                                  retryableErrors.includes(error.code);
-                
-                if (!isRetryable) break;
-
-                const delay = baseDelay * Math.pow(2, attempt);
-                await new Promise(resolve => setTimeout(resolve, delay));
-            }
-        }
-
-        throw lastError;
-    }
+  }
 }
