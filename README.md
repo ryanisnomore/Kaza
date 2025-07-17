@@ -1,4 +1,4 @@
-## Kaza 
+# Kaza 
 
 #### A [Shoukaku](https://github.com/Deivu/Shoukaku) wrapper with built in queue system Advanced Lavalink wrapper with intelligent multi-platform search and comprehensive error handling
 
