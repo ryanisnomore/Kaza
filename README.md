@@ -6,7 +6,6 @@
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/y/ryanisnomore/Kaza)
 ![License](https://img.shields.io/github/license/ryanisnomore/Kaza)
 ![TypeScript](https://img.shields.io/badge/language-Typescript-blue.svg)
-![Node](https://img.shields.io/node/v/kaza)
 
 ---
 
