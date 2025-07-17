@@ -1,20 +1,52 @@
-# Kaza 
+# Kaza
 
-#### A [Shoukaku](https://github.com/Deivu/Shoukaku) wrapper with built in queue system Advanced Lavalink wrapper with intelligent multi-platform search and comprehensive error handling
+![Downloads](https://img.shields.io/npm/dm/kaza)
+![GitHub contributors](https://img.shields.io/github/contributors/ryanisnomore/Kaza)
+![GitHub release](https://img.shields.io/github/v/release/ryanisnomore/Kaza)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/y/ryanisnomore/Kaza)
+![License](https://img.shields.io/github/license/ryanisnomore/Kaza)
+![TypeScript](https://img.shields.io/badge/language-Typescript-blue.svg)
+![Node](https://img.shields.io/node/v/kaza)
 
-![Downloads](https://img.shields.io/npm/dm/kaza) ![GitHub contributors](https://img.shields.io/github/contributors/ryanisnomore/Kaza) ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/ryanisnomore/Kaza) ![GitHub last commit](https://img.shields.io/github/last-commit/ryanisnomore/Kaza) 
+---
 
-Kaza is a powerful Discord music bot library built on top of Shoukaku, designed for modern multi-platform music streaming with **LavaSrc 4.7.2** integration. It provides intelligent URL detection, advanced search capabilities, robust error handling, and a sophisticated plugin system.
+## 🚀 Latest Release
+
+**Version:** [3.3.0](https://github.com/ryanisnomore/Kaza/releases/tag/kaza)  
+**Published:** 2025-07-17
+
+**Release Notes:**
+✨ Key Features  
+🎯 Intelligent Platform Detection - Automatic URL parsing and platform recognition  
+🔍 Advanced Search Logic - Smart fallback engines and caching system  
+🛡️ Comprehensive Error Handling - Detailed error messages with recovery suggestions  
+🔧 Enhanced Plugin System - Configurable plugins with dependency management  
+📊 Health Monitoring - Real-time system health checks and statistics  
+⚡ Performance Optimized - Built-in caching, retry logic, and connection pooling  
+🌐 Multi-Platform Support - All platforms through LavaSrc configuration
+
+---
+
+## 📦 About
+
+**Kaza** is a professional Discord music bot library built on top of [Shoukaku](https://github.com/Deivu/Shoukaku), fully rewritten for modern multi-platform music streaming. It features advanced queue management, intelligent multi-platform search, robust error handling, and full TypeScript support. Kaza is ideal for developers seeking a comprehensive, extensible, and high-performance solution for Discord music bots.
+
+> **Project Description:**  
+> _A Rewrite Kazagumo, A Shoukaku wrapper that has built-in queue system._
+
+---
 
 ## ✨ Key Features
 
-- **🎯 Intelligent Platform Detection** - Automatic URL parsing and platform recognition
-- **🔍 Advanced Search Logic** - Smart fallback engines and caching system
-- **🛡️ Comprehensive Error Handling** - Detailed error messages with recovery suggestions
-- **🔧 Enhanced Plugin System** - Configurable plugins with dependency management
-- **📊 Health Monitoring** - Real-time system health checks and statistics
-- **⚡ Performance Optimized** - Built-in caching, retry logic, and connection pooling
-- **🌐 Multi-Platform Support** - All platforms through LavaSrc configuration
+- **🎯 Intelligent Platform Detection:** Automatic URL parsing and platform recognition.
+- **🔍 Advanced Search Logic:** Smart fallback engines and intelligent caching system.
+- **🛡️ Comprehensive Error Handling:** Detailed error messages and recovery suggestions.
+- **🔧 Enhanced Plugin System:** Configurable plugins with dependency management.
+- **📊 Health Monitoring:** Real-time system health checks and statistics.
+- **⚡ Performance Optimized:** Built-in caching, retry logic, and connection pooling.
+- **🌐 Multi-Platform Support:** All platforms through LavaSrc configuration.
+
+---
 
 ## 🚀 Supported Platforms
 
@@ -29,6 +61,8 @@ Kaza is a powerful Discord music bot library built on top of Shoukaku, designed 
 - **Bandcamp** (no credentials required)
 - **HTTP Streams**
 
+---
+
 ## 📦 Installation
 
 ```bash
@@ -37,18 +71,22 @@ npm install kaza
 npm install git+https://github.com/ryanisnomore/Kaza.git
 ```
 
+---
+
 ## 🔧 Prerequisites
 
-1. **Lavalink Server** with **LavaSrc 4.7.2** plugin
-2. **Discord.js v14+**
-3. **Node.js 16.5.0+**
+- **Lavalink Server** with **LavaSrc 4.7.2** plugin
+- **Discord.js v14+**
+- **Node.js 16.5.0+**
+
+---
 
 ## 🚀 Quick Start
 
-```javascript
-const { Client, GatewayIntentBits } = require('discord.js');
-const { Connectors } = require('shoukaku');
-const { Kaza, PlayerMoved } = require('kaza');
+```typescript
+import { Client, GatewayIntentBits } from 'discord.js';
+import { Connectors } from 'shoukaku';
+import { Kaza, PlayerMoved } from 'kaza';
 
 const client = new Client({
     intents: [
@@ -77,7 +115,6 @@ const kaza = new Kaza({
     }
 }, new Connectors.DiscordJS(client), nodes);
 
-// Enhanced search with auto-detection
 client.on('messageCreate', async (message) => {
     if (message.content === '!play despacito') {
         const player = kaza.createPlayer({
@@ -86,7 +123,6 @@ client.on('messageCreate', async (message) => {
             textId: message.channel.id
         });
 
-        // Auto-detects best platform and search method
         const result = await kaza.autoSearch('despacito', {
             requester: message.author,
             fallbackEngines: ['ytmsearch', 'spsearch']
@@ -102,12 +138,14 @@ client.on('messageCreate', async (message) => {
 client.login('your-bot-token');
 ```
 
+---
+
 ## 🎯 Advanced Usage
 
 ### Smart URL Detection
 
-```javascript
-// Automatically detects platform and optimal search method
+```typescript
+// Detect platform and optimal search method
 const spotifyResult = await kaza.autoSearch('https://open.spotify.com/track/...');
 const appleResult = await kaza.autoSearch('https://music.apple.com/...');
 const youtubeResult = await kaza.autoSearch('https://youtube.com/watch?v=...');
@@ -120,7 +158,7 @@ console.log(urlInfo.type); // 'track'
 
 ### Enhanced Search Options
 
-```javascript
+```typescript
 const result = await kaza.search('my favorite song', {
     requester: message.author,
     limit: 5,
@@ -133,8 +171,7 @@ const result = await kaza.search('my favorite song', {
 
 ### Platform-Specific Searches
 
-```javascript
-// Search specific platforms with fallbacks
+```typescript
 const spotifyTracks = await kaza.searchSpotify('artist - song');
 const appleTracks = await kaza.searchAppleMusic('album name');
 const youtubeTracks = await kaza.searchYouTube('music video');
@@ -142,7 +179,7 @@ const youtubeTracks = await kaza.searchYouTube('music video');
 
 ### Error Handling
 
-```javascript
+```typescript
 try {
     const result = await kaza.search('invalid query');
 } catch (error) {
@@ -156,13 +193,11 @@ try {
 
 ### Health Monitoring
 
-```javascript
-// Check system health
+```typescript
 const health = await kaza.healthCheck();
 console.log('Status:', health.status); // 'healthy', 'degraded', or 'unhealthy'
 console.log('Components:', health.components);
 
-// Get detailed statistics
 const stats = kaza.getStats();
 console.log('Players:', stats.players);
 console.log('Search cache hit rate:', stats.search.cacheHitRate);
@@ -171,7 +206,7 @@ console.log('Supported platforms:', stats.search.supportedPlatforms);
 
 ### Plugin Configuration
 
-```javascript
+```typescript
 const kaza = new Kaza({
     plugins: {
         'PlayerMoved': { 
@@ -187,13 +222,17 @@ const kaza = new Kaza({
 }, connector, nodes);
 ```
 
+---
+
 ## 🔌 Built-in Plugins
 
-- **PlayerMoved** - Handles voice channel changes
-- **AutoLeave** - Leaves empty channels automatically
-- **QueueSaver** - Saves queues on shutdown
-- **VolumeNormalizer** - Normalizes audio levels
-- **CrossFade** - Smooth track transitions
+- **PlayerMoved** — Handles voice channel changes
+- **AutoLeave** — Leaves empty channels automatically
+- **QueueSaver** — Saves queues on shutdown
+- **VolumeNormalizer** — Normalizes audio levels
+- **CrossFade** — Smooth track transitions
+
+---
 
 ## ⚙️ Lavalink Configuration
 
@@ -219,7 +258,6 @@ plugins:
       - "tidal:%QUERY%"
       - "bandcamp:%QUERY%"
     
-    # Add your API credentials here
     spotify:
       clientId: "your_spotify_client_id"
       clientSecret: "your_spotify_client_secret"
@@ -229,43 +267,55 @@ plugins:
       mediaAPIToken: "your_apple_music_token"
 ```
 
+---
+
 ## 📊 Performance Features
 
-- **Intelligent Caching** - Automatic result caching with TTL
-- **Connection Pooling** - Efficient node management
-- **Retry Logic** - Exponential backoff for failed requests
-- **Fallback Engines** - Automatic fallback to alternative sources
-- **Health Monitoring** - Real-time system health tracking
+- **Intelligent Caching:** Automatic result caching with TTL
+- **Connection Pooling:** Efficient node management
+- **Retry Logic:** Exponential backoff for failed requests
+- **Fallback Engines:** Automatic fallback to alternative sources
+- **Health Monitoring:** Real-time system health tracking
+
+---
 
 ## 🛠️ API Reference
 
 ### Core Classes
 
-- **Kaza** - Main library class
-- **KazagumoPlayer** - Individual guild music player
-- **KazagumoQueue** - Advanced queue management
-- **SearchManager** - Intelligent search handling
+- **Kaza** — Main library class
+- **KazagumoPlayer** — Individual guild music player
+- **KazagumoQueue** — Advanced queue management
+- **SearchManager** — Intelligent search handling
 
 ### Utilities
 
-- **URLParser** - URL detection and platform identification
-- **ErrorHandler** - Comprehensive error management
-- **PluginConfig** - Plugin configuration and management
+- **URLParser** — URL detection and platform identification
+- **ErrorHandler** — Comprehensive error management
+- **PluginConfig** — Plugin configuration and management
+
+---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please open an issue or submit a pull request.  
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+
+---
 
 ## 📜 License
 
 This project is licensed under the ISC License.
 
+---
+
 ## 🔗 Links
 
-- **Documentation**: [Full API Documentation Will Ready Soon](https://discord.gg/W2GheK3F9m)
-- **Examples**: [Usage Examples](./example)
-- **Discord**: [Support Server](https://discord.gg/W2GheK3F9m)
+- **Documentation:** [API Docs (Coming Soon)](https://discord.gg/W2GheK3F9m)
+- **Examples:** [Usage Examples](./example)
+- **Discord:** [Support Server](https://discord.gg/W2GheK3F9m)
+- **Latest Release:** [v3.3.0](https://github.com/ryanisnomore/Kaza/releases/tag/kaza)
 
 ---
 
-**Kaza** - Making Discord music bots smarter, one search at a time. 🎵
+**Kaza** — Making Discord music bots smarter, one search at a time. 🎵
