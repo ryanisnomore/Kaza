@@ -4,8 +4,8 @@ import {
     KazagumoTrack,
     SearchEngine 
 } from '../types';
-import { URLParser, URLParseResult } from '../utils/URLParser';
-import { ErrorHandler, ErrorCode, KazaError } from '../utils/ErrorHandler';
+import { URLParser, URLParseResult } from '../Utils/URLParser';
+import { ErrorHandler, ErrorCode, KazaError } from '../Utils/ErrorHandler';
 
 export interface EnhancedSearchOptions extends KazagumoSearchOptions {
     timeout?: number;
