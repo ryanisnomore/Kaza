@@ -1,4 +1,4 @@
-# Enhanced Kazagumo
+# Kaza
 
 A powerful Discord music bot library built on top of Shoukaku with comprehensive multi-platform support through **LavaSrc 4.7.2** integration. This library eliminates the need for external API calls by leveraging your Lavalink server's LavaSrc configuration for all platform support.
 
@@ -34,14 +34,14 @@ A powerful Discord music bot library built on top of Shoukaku with comprehensive
 ## 📦 Installation
 
 ```bash
-npm install enhanced-kazagumo shoukaku
+npm install kaza
 ```
 
 ## 🛠️ Setup Requirements
 
 ### 1. Lavalink Server with LavaSrc 4.7.2
 
-First, set up your Lavalink server with LavaSrc 4.7.2. Copy the provided `lavalink-application.yml` configuration and add your platform API credentials:
+First, set up your Lavalink server with LavaSrc 4.7.2. Copy the provided example `application.yml` configuration and add your platform API credentials:
 
 ```yaml
 # Essential LavaSrc configuration
@@ -68,14 +68,14 @@ While YouTube works without credentials, other platforms require API keys:
 - **Apple Music**: Media API Token from [Apple Developer Portal](https://developer.apple.com/)
 - **Deezer**: ARL and Master Key (advanced users)
 - **SoundCloud**: Client ID from SoundCloud API
-- **Other platforms**: See `lavalink-application.yml` for details
+- **Other platforms**: See `application.yml` for details
 
 ## ⚡ Quick Start
 
 ```javascript
 const { Client, GatewayIntentBits } = require('discord.js');
 const { Connectors } = require('shoukaku');
-const { Kazagumo, PlayerMoved } = require('enhanced-kazagumo');
+const { Kazagumo, PlayerMoved } = require('kaza');
 
 const client = new Client({
     intents: [
