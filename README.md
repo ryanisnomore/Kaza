@@ -2,7 +2,7 @@
 
 #### A [Shoukaku](https://github.com/Deivu/Shoukaku) wrapper with built in queue system Advanced Lavalink wrapper with intelligent multi-platform search and comprehensive error handling
 
-![AppVeyor](https://img.shields.io/appveyor/build/ryanisnomore/Kaza) ![Downloads](https://img.shields.io/npm/dm/kaza) ![GitHub contributors](https://img.shields.io/github/contributors/ryanisnomore/Kaza) ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/ryanisnomore/Kaza) ![GitHub last commit](https://img.shields.io/github/last-commit/ryanisnomore/Kaza) 
+![Downloads](https://img.shields.io/npm/dm/kaza) ![GitHub contributors](https://img.shields.io/github/contributors/ryanisnomore/Kaza) ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/ryanisnomore/Kaza) ![GitHub last commit](https://img.shields.io/github/last-commit/ryanisnomore/Kaza) 
 
 Kaza is a powerful Discord music bot library built on top of Shoukaku, designed for modern multi-platform music streaming with **LavaSrc 4.7.2** integration. It provides intelligent URL detection, advanced search capabilities, robust error handling, and a sophisticated plugin system.
 
