@@ -1,6 +1,6 @@
 {
   "name": "kaza",
-  "version": "3.3.0",
+  "version": "1.0.0",
   "description": "Advanced Lavalink wrapper with intelligent multi-platform search and comprehensive error handling",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
