@@ -1,121 +1,171 @@
+/**
+ * Type definitions for Kaza
+ */
+
+export * from './KazagumoTypes';
+
+import { EventEmitter } from 'events';
 import { Player, Node } from 'shoukaku';
 
+// Core interfaces
 export interface KazagumoOptions {
-    defaultSearchEngine?: string;
-    searchLimit?: number;
-    sourceForceSearch?: boolean;
-    send: (guildId: string, payload: any) => void;
-    plugins?: KazagumoPlugin[];
-    resume?: boolean;
-    resumeByLibrary?: boolean;
-    resumeTimeout?: number;
-    reconnectTries?: number;
-    reconnectTimeout?: number;
-    userAgent?: string;
-    nodeResolver?: (nodes: Map<string, Node>, connection?: any) => Node | undefined;
+  defaultSearchEngine?: string;
+  send: (guildId: string, payload: any) => void;
+  plugins?: Record<string, PluginOptions>;
+  searchOptions?: SearchOptions;
+  nodeOptions?: NodeOptions;
+}
+
+export interface PluginOptions {
+  enabled: boolean;
+  priority?: number;
+  config?: Record<string, any>;
+}
+
+export interface SearchOptions {
+  cacheResults?: boolean;
+  cacheTTL?: number;
+  retryAttempts?: number;
+  timeout?: number;
+  fallbackEngines?: string[];
+}
+
+export interface NodeOptions {
+  retryAttempts?: number;
+  retryDelay?: number;
+  secure?: boolean;
 }
 
 export interface KazagumoSearchOptions {
-    requester?: any;
-    limit?: number;
-    source?: string;
+  requester?: any;
+  limit?: number;
+  source?: string;
+  timeout?: number;
+  fallbackEngines?: string[];
+  retryAttempts?: number;
+  cacheResults?: boolean;
 }
 
 export interface KazagumoSearchResult {
-    type: 'track' | 'playlist' | 'search' | 'error';
-    tracks: KazagumoTrack[];
-    playlistName?: string;
-    source?: string;
-}
-
-export interface KazagumoCreatePlayerOptions {
-    guildId: string;
-    voiceId: string;
-    textId?: string;
-    deaf?: boolean;
-    mute?: boolean;
-    volume?: number;
-}
-
-export interface KazagumoPlayerOptions extends KazagumoCreatePlayerOptions {
-    node?: KazagumoNode;
-}
-
-export interface KazagumoNode extends Node {
-    // Extended properties for Kazagumo
-}
-
-export interface KazagumoTrackInfo {
-    identifier: string;
-    isSeekable: boolean;
-    author: string;
-    title: string;
-    uri: string;
-    sourceName?: string;
-    artworkUrl?: string;
-    albumName?: string;
-    artistUrl?: string;
-    albumUrl?: string;
-    preview?: string;
-    isrc?: string;
-    length?: number;
+  loadType: 'track' | 'playlist' | 'search' | 'empty' | 'error';
+  playlistInfo?: {
+    name: string;
+    selectedTrack?: number;
+  };
+  tracks: KazagumoTrack[];
+  exception?: {
+    message: string;
+    severity: string;
+  };
 }
 
 export interface KazagumoTrack {
-    encoded: string;
-    info: KazagumoTrackInfo;
-    pluginInfo: any;
-    requester?: any;
-    realUri?: string;
+  track: string;
+  info: {
+    identifier: string;
+    title: string;
+    author: string;
+    length: number;
+    artworkUrl?: string;
+    uri?: string;
+    isrc?: string;
+    sourceName: string;
+    isSeekable: boolean;
+    isStream: boolean;
+    position?: number;
+  };
+  pluginInfo?: Record<string, any>;
+  userData?: any;
+  requester?: any;
 }
 
-export interface KazagumoPlugin {
-    name: string;
-    load(kazagumo: any): void;
-    unload?(kazagumo: any): void;
+export interface PlayerOptions {
+  guildId: string;
+  voiceId: string;
+  textId?: string;
+  deaf?: boolean;
+  mute?: boolean;
+  volume?: number;
 }
 
-export interface KazagumoEvents {
-    ready: [name: string, reconnected?: boolean];
-    error: [name: string, error: Error];
-    close: [name: string, code: number, reason: string];
-    disconnect: [name: string, count: number];
-    raw: [name: string, data: unknown];
-    playerCreate: [player: any];
-    playerStart: [player: any, track: KazagumoTrack];
-    playerEnd: [player: any, track: KazagumoTrack, reason: string];
-    playerEmpty: [player: any];
-    playerClosed: [player: any, data: any];
-    playerUpdate: [player: any, data: any];
-    playerResumed: [player: any];
-    playerDestroy: [player: any];
-    playerException: [player: any, data: any];
-    playerStuck: [player: any, data: any];
-    trackStart: [player: any, track: KazagumoTrack];
-    trackEnd: [player: any, track: KazagumoTrack, reason: string];
-    trackStuck: [player: any, track: KazagumoTrack, data: any];
-    trackError: [player: any, track: KazagumoTrack, data: any];
-    queueEnd: [player: any];
+export interface URLInfo {
+  platform: string;
+  type: 'track' | 'playlist' | 'album' | 'artist' | 'unknown';
+  id: string;
+  url: string;
+  isValid: boolean;
 }
 
-// LavaSrc search engines available through Lavalink
-export type SearchEngine = 
-    | 'youtube' | 'ytmsearch' | 'ytsearch'
-    | 'spsearch' | 'amsearch' | 'dzsearch' 
-    | 'scsearch' | 'jiosaavn' | 'bandcamp'
-    | 'qobuz' | 'tidal' | 'flowery';
-
-export interface RepeatMode {
-    NONE: 0;
-    TRACK: 1;
-    QUEUE: 2;
+export interface HealthCheckResult {
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  components: {
+    shoukaku: boolean;
+    search: boolean;
+    cache: boolean;
+    plugins: boolean;
+  };
+  timestamp: number;
 }
 
-export const RepeatMode: RepeatMode = {
-    NONE: 0,
-    TRACK: 1,
-    QUEUE: 2
+export interface KazagumoStats {
+  players: number;
+  playingPlayers: number;
+  nodes: number;
+  uptime: number;
+  search: {
+    totalSearches: number;
+    cacheHits: number;
+    cacheHitRate: number;
+    supportedPlatforms: string[];
+  };
+}
+
+export interface KazagumoError extends Error {
+  code: string;
+  recoverable: boolean;
+  suggestions?: string[];
+}
+
+export type KazagumoEvents = {
+  playerCreate: [player: KazagumoPlayer];
+  playerDestroy: [player: KazagumoPlayer];
+  playerUpdate: [player: KazagumoPlayer];
+  playerEmpty: [player: KazagumoPlayer];
+  playerException: [player: KazagumoPlayer, exception: any];
+  trackStart: [player: KazagumoPlayer, track: KazagumoTrack];
+  trackEnd: [player: KazagumoPlayer, track: KazagumoTrack];
+  trackException: [player: KazagumoPlayer, track: KazagumoTrack, exception: any];
+  trackStuck: [player: KazagumoPlayer, track: KazagumoTrack];
+  queueEnd: [player: KazagumoPlayer];
+  playerMoved: [player: KazagumoPlayer, oldChannel: string, newChannel: string];
+  ready: [name: string];
+  error: [name: string, error: Error];
+  close: [name: string, code: number, reason: string];
+  disconnect: [name: string, moved: boolean];
+  reconnecting: [name: string];
 };
 
+// Re-export Shoukaku types for convenience
+export { Player, Node } from 'shoukaku';
 
-export { KazagumoQueue } from '../managers/KazagumoQueue';
+// Forward type declarations to avoid circular imports
+export type KazagumoPlayer = import('../Managers/KazagumoPlayer').KazagumoPlayer;
+export type KazagumoQueue = import('../Managers/KazagumoQueue').KazagumoQueue;
+
+// Add missing exports
+export type PluginMetadata = {
+  name: string;
+  version: string;
+  description: string;
+  author: string;
+  priority?: number;
+  enabled?: boolean;
+  dependencies?: string[];
+};
+
+export interface PluginInterface {
+  metadata: PluginMetadata;
+  initialize(kazagumo: any): Promise<void>;
+  destroy(): Promise<void>;
+  [key: string]: any;
+}
