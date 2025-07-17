@@ -1,475 +1,293 @@
+/**
+ * Kazagumo - Advanced Lavalink wrapper with intelligent multi-platform search
+ */
+
 import { EventEmitter } from 'events';
-import { Shoukaku, Connector, NodeOption } from 'shoukaku';
+import { Shoukaku, Connector, Node } from 'shoukaku';
 import { KazagumoPlayer } from './Managers/KazagumoPlayer';
 import { EnhancedSearchManager } from './Managers/EnhancedSearchManager';
-import { PluginConfig } from './config/PluginConfig';
-import { ErrorHandler, ErrorCode } from './Utils/ErrorHandler';
 import { URLParser } from './Utils/URLParser';
-import { 
-    KazagumoOptions, 
-    KazagumoCreatePlayerOptions,
-    KazagumoSearchOptions,
-    KazagumoSearchResult,
-    KazagumoEvents,
-    KazagumoPlugin
+import { ErrorHandler, ErrorCode } from './Utils/ErrorHandler';
+import { PluginConfig } from './config/PluginConfig';
+import {
+  KazagumoOptions,
+  KazagumoSearchOptions,
+  KazagumoSearchResult,
+  PlayerOptions,
+  URLInfo,
+  HealthCheckResult,
+  KazagumoStats,
+  KazagumoEvents,
+  KazagumoError
 } from './types';
 
+/**
+ * Main Kazagumo class - Advanced Lavalink wrapper
+ */
 export class Kazagumo extends EventEmitter {
-    public shoukaku: Shoukaku;
-    public players: Map<string, KazagumoPlayer> = new Map();
-    public searchManager: EnhancedSearchManager;
-    public options: KazagumoOptions;
-    public pluginConfig: PluginConfig;
-    private plugins: Set<KazagumoPlugin> = new Set();
-    private startTime: number = Date.now();
-    private stats = {
-        players: 0,
-        playingPlayers: 0,
-        connectedNodes: 0,
-        totalSearches: 0,
-        errors: 0
+  public readonly shoukaku: Shoukaku;
+  public readonly searchManager: EnhancedSearchManager;
+  public readonly urlParser: URLParser;
+  public readonly errorHandler: ErrorHandler;
+  public readonly pluginConfig: PluginConfig;
+  public readonly players: Map<string, KazagumoPlayer>;
+  public readonly options: KazagumoOptions;
+
+  private readonly stats: KazagumoStats;
+  private readonly startTime: number;
+
+  constructor(options: KazagumoOptions, connector: Connector, nodes: any[]) {
+    super();
+    
+    this.options = {
+      defaultSearchEngine: 'ytsearch',
+      ...options
     };
 
-    constructor(
-        options: KazagumoOptions, 
-        connector: Connector, 
-        nodes: NodeOption[]
-    ) {
-        super();
-        
-        this.options = {
-            defaultSearchEngine: 'ytsearch',
-            searchLimit: 10,
-            sourceForceSearch: false,
-            resume: false,
-            resumeByLibrary: false,
-            resumeTimeout: 30000,
-            reconnectTries: 3,
-            reconnectTimeout: 5000,
-            userAgent: 'Kaza/3.3.0',
-            ...options
-        };
+    this.shoukaku = new Shoukaku(connector, nodes);
+    this.searchManager = new EnhancedSearchManager(this);
+    this.urlParser = new URLParser();
+    this.errorHandler = new ErrorHandler();
+    this.pluginConfig = new PluginConfig(this.options.plugins || {});
+    this.players = new Map();
+    this.startTime = Date.now();
 
-        // Initialize plugin configuration
-        this.pluginConfig = new PluginConfig(
-            Array.isArray(options.plugins) ? {} : options.plugins
-        );
+    this.stats = {
+      players: 0,
+      playingPlayers: 0,
+      nodes: 0,
+      uptime: 0,
+      search: {
+        totalSearches: 0,
+        cacheHits: 0,
+        cacheHitRate: 0,
+        supportedPlatforms: [
+          'youtube',
+          'youtubeMusic',
+          'spotify',
+          'appleMusic',
+          'deezer',
+          'soundcloud',
+          'jiosaavn',
+          'qobuz',
+          'tidal',
+          'bandcamp'
+        ]
+      }
+    };
 
-        // Initialize Shoukaku with LavaSrc support
-        this.shoukaku = new Shoukaku(connector, nodes, {
-            resume: this.options.resume || false,
-            resumeTimeout: this.options.resumeTimeout || 30000,
-            reconnectTries: this.options.reconnectTries || 3,
-            restTimeout: 60000,
-            moveOnDisconnect: false,
-            userAgent: this.options.userAgent || 'Kaza/3.3.0'
-        });
+    this.initializeEventListeners();
+    this.initializePlugins();
+  }
 
-        this.searchManager = new EnhancedSearchManager(this);
-        this.setupEventListeners();
-        this.loadPlugins();
+  /**
+   * Initialize event listeners for Shoukaku
+   */
+  private initializeEventListeners(): void {
+    this.shoukaku.on('ready', (name) => {
+      this.emit('ready', name);
+    });
+
+    this.shoukaku.on('error', (name, error) => {
+      this.emit('error', name, error);
+    });
+
+    this.shoukaku.on('close', (name, code, reason) => {
+      this.emit('close', name, code, reason);
+    });
+
+    this.shoukaku.on('disconnect', (name, moved) => {
+      this.emit('disconnect', name, Boolean(moved));
+    });
+
+    this.shoukaku.on('reconnecting', (name) => {
+      this.emit('reconnecting', name);
+    });
+  }
+
+  /**
+   * Initialize configured plugins
+   */
+  private async initializePlugins(): Promise<void> {
+    try {
+      await this.pluginConfig.initializePlugins(this);
+    } catch (error) {
+      this.errorHandler.handleError(error as Error, 'PLUGIN_INITIALIZATION_ERROR');
+    }
+  }
+
+  /**
+   * Create a new player for a guild
+   */
+  public createPlayer(options: PlayerOptions): KazagumoPlayer {
+    const existing = this.players.get(options.guildId);
+    if (existing) {
+      return existing;
     }
 
-    private setupEventListeners(): void {
-        // Shoukaku events
-        this.shoukaku.on('ready', (name, reconnected) => {
-            this.emit('ready', name, reconnected);
-        });
+    const player = new KazagumoPlayer(this, options);
+    this.players.set(options.guildId, player);
+    this.stats.players++;
+    
+    this.emit('playerCreate', player);
+    return player;
+  }
 
-        this.shoukaku.on('error', (name, error) => {
-            this.emit('error', name, error);
-        });
+  /**
+   * Get an existing player
+   */
+  public getPlayer(guildId: string): KazagumoPlayer | undefined {
+    return this.players.get(guildId);
+  }
 
-        this.shoukaku.on('close', (name, code, reason) => {
-            this.emit('close', name, code, reason);
-        });
+  /**
+   * Destroy a player
+   */
+  public destroyPlayer(guildId: string): boolean {
+    const player = this.players.get(guildId);
+    if (!player) return false;
 
-        this.shoukaku.on('disconnect', (name, count) => {
-            this.emit('disconnect', name, count);
-            
-            // Handle player cleanup on disconnect
-            console.log(`Node ${name} disconnected, ${count} players affected`);
-        });
+    player.destroy();
+    this.players.delete(guildId);
+    this.stats.players--;
+    
+    this.emit('playerDestroy', player);
+    return true;
+  }
 
-        this.shoukaku.on('raw', (name, data) => {
-            this.emit('raw', name, data);
-        });
+  /**
+   * Search for tracks with intelligent platform detection
+   */
+  public async search(query: string, options?: KazagumoSearchOptions): Promise<KazagumoSearchResult> {
+    this.stats.search.totalSearches++;
+    
+    try {
+      return await this.searchManager.search(query, options);
+    } catch (error) {
+      throw this.errorHandler.createError(
+        ErrorCode.SEARCH_FAILED,
+        `Search failed: ${(error as Error).message}`,
+        true,
+        ['Check your query format', 'Verify Lavalink server status', 'Try a different search engine']
+      );
+    }
+  }
+
+  /**
+   * Auto search with intelligent platform detection and fallback
+   */
+  public async autoSearch(query: string, options?: KazagumoSearchOptions): Promise<KazagumoSearchResult> {
+    const urlInfo = this.urlParser.parseURL(query);
+    
+    if (urlInfo.isValid) {
+      return await this.searchManager.searchByURL(query, options);
+    }
+    
+    return await this.searchManager.searchWithFallback(query, options);
+  }
+
+  /**
+   * Parse URL and get platform information
+   */
+  public parseURL(url: string): URLInfo {
+    return this.urlParser.parseURL(url);
+  }
+
+  /**
+   * Check if error is a Kaza error
+   */
+  public isKazaError(error: any): error is KazagumoError {
+    return error && typeof error.code === 'string' && typeof error.recoverable === 'boolean';
+  }
+
+  /**
+   * Get current statistics
+   */
+  public getStats(): KazagumoStats {
+    this.stats.uptime = Date.now() - this.startTime;
+    this.stats.playingPlayers = Array.from(this.players.values()).filter(p => p.playing).length;
+    this.stats.nodes = this.shoukaku.nodes.size;
+    this.stats.search.cacheHitRate = this.stats.search.totalSearches > 0 
+      ? (this.stats.search.cacheHits / this.stats.search.totalSearches) * 100 
+      : 0;
+    
+    return { ...this.stats };
+  }
+
+  /**
+   * Perform health check
+   */
+  public async healthCheck(): Promise<HealthCheckResult> {
+    const components = {
+      shoukaku: this.shoukaku.nodes.size > 0,
+      search: await this.searchManager.healthCheck(),
+      cache: this.searchManager.isCacheHealthy(),
+      plugins: this.pluginConfig.arePluginsHealthy()
+    };
+
+    const healthyCount = Object.values(components).filter(Boolean).length;
+    const totalCount = Object.keys(components).length;
+
+    let status: 'healthy' | 'degraded' | 'unhealthy';
+    if (healthyCount === totalCount) {
+      status = 'healthy';
+    } else if (healthyCount > totalCount / 2) {
+      status = 'degraded';
+    } else {
+      status = 'unhealthy';
     }
 
-    private loadPlugins(): void {
-        if (this.options.plugins) {
-            this.options.plugins.forEach(plugin => {
-                this.loadPlugin(plugin);
-            });
-        }
+    return {
+      status,
+      components,
+      timestamp: Date.now()
+    };
+  }
+
+  /**
+   * Platform-specific search methods
+   */
+  public async searchSpotify(query: string, options?: KazagumoSearchOptions): Promise<KazagumoSearchResult> {
+    return await this.searchManager.searchPlatform('spotify', query, options);
+  }
+
+  public async searchYouTube(query: string, options?: KazagumoSearchOptions): Promise<KazagumoSearchResult> {
+    return await this.searchManager.searchPlatform('youtube', query, options);
+  }
+
+  public async searchAppleMusic(query: string, options?: KazagumoSearchOptions): Promise<KazagumoSearchResult> {
+    return await this.searchManager.searchPlatform('appleMusic', query, options);
+  }
+
+  public async searchSoundCloud(query: string, options?: KazagumoSearchOptions): Promise<KazagumoSearchResult> {
+    return await this.searchManager.searchPlatform('soundcloud', query, options);
+  }
+
+  /**
+   * Clean up resources
+   */
+  public async destroy(): Promise<void> {
+    // Destroy all players
+    for (const [guildId] of this.players) {
+      this.destroyPlayer(guildId);
     }
 
-    public loadPlugin(plugin: KazagumoPlugin): void {
-        if (this.plugins.has(plugin)) {
-            throw new Error(`Plugin ${plugin.name} is already loaded`);
-        }
+    // Clean up plugins
+    await this.pluginConfig.destroyPlugins();
 
-        try {
-            plugin.load(this);
-            this.plugins.add(plugin);
-            console.log(`Plugin ${plugin.name} loaded successfully`);
-        } catch (error) {
-            console.error(`Failed to load plugin ${plugin.name}:`, error);
-            throw error;
-        }
-    }
+    // Clean up search manager
+    this.searchManager.destroy();
 
-    public unloadPlugin(plugin: KazagumoPlugin): void {
-        if (!this.plugins.has(plugin)) {
-            throw new Error(`Plugin ${plugin.name} is not loaded`);
-        }
+    // Remove all listeners
+    this.removeAllListeners();
+  }
+}
 
-        try {
-            if (plugin.unload) {
-                plugin.unload(this);
-            }
-            this.plugins.delete(plugin);
-            console.log(`Plugin ${plugin.name} unloaded successfully`);
-        } catch (error) {
-            console.error(`Failed to unload plugin ${plugin.name}:`, error);
-            throw error;
-        }
-    }
-
-    /**
-     * Search for tracks using LavaSrc 4.7.2
-     */
-    public async search(
-        query: string, 
-        options: KazagumoSearchOptions = {}
-    ): Promise<KazagumoSearchResult> {
-        return this.searchManager.search(query, options);
-    }
-
-    /**
-     * Platform-specific search methods
-     */
-    public async searchYouTube(query: string, options: KazagumoSearchOptions = {}): Promise<KazagumoSearchResult> {
-        return this.searchManager.searchYouTube(query, options);
-    }
-
-    public async searchSpotify(query: string, options: KazagumoSearchOptions = {}): Promise<KazagumoSearchResult> {
-        return this.searchManager.searchSpotify(query, options);
-    }
-
-    public async searchAppleMusic(query: string, options: KazagumoSearchOptions = {}): Promise<KazagumoSearchResult> {
-        return this.searchManager.searchAppleMusic(query, options);
-    }
-
-    public async searchDeezer(query: string, options: KazagumoSearchOptions = {}): Promise<KazagumoSearchResult> {
-        return this.searchManager.searchDeezer(query, options);
-    }
-
-    public async searchSoundCloud(query: string, options: KazagumoSearchOptions = {}): Promise<KazagumoSearchResult> {
-        return this.searchManager.searchSoundCloud(query, options);
-    }
-
-    public async searchJioSaavn(query: string, options: KazagumoSearchOptions = {}): Promise<KazagumoSearchResult> {
-        return this.searchManager.searchJioSaavn(query, options);
-    }
-
-    public async searchQobuz(query: string, options: KazagumoSearchOptions = {}): Promise<KazagumoSearchResult> {
-        return this.searchManager.searchQobuz(query, options);
-    }
-
-    public async searchTidal(query: string, options: KazagumoSearchOptions = {}): Promise<KazagumoSearchResult> {
-        return this.searchManager.searchTidal(query, options);
-    }
-
-    public async searchBandcamp(query: string, options: KazagumoSearchOptions = {}): Promise<KazagumoSearchResult> {
-        return this.searchManager.searchBandcamp(query, options);
-    }
-
-    /**
-     * Create a new player
-     */
-    public createPlayer(options: KazagumoCreatePlayerOptions): KazagumoPlayer {
-        if (this.players.has(options.guildId)) {
-            throw new Error(`Player for guild ${options.guildId} already exists`);
-        }
-
-        const node = this.getLeastUsedNode();
-        if (!node) {
-            throw new Error('No available nodes');
-        }
-
-        const player = new KazagumoPlayer({
-            ...options,
-            node
-        });
-
-        this.players.set(options.guildId, player);
-        
-        // Forward player events
-        player.on('trackStart', (player, track) => this.emit('trackStart', player, track));
-        player.on('trackEnd', (player, track, reason) => this.emit('trackEnd', player, track, reason));
-        player.on('queueEnd', (player) => this.emit('queueEnd', player));
-        player.on('playerException', (player, data) => this.emit('playerException', player, data));
-        player.on('playerUpdate', (player, data) => this.emit('playerUpdate', player, data));
-        player.on('playerStuck', (player, data) => this.emit('playerStuck', player, data));
-        player.on('playerClosed', (player, data) => this.emit('playerClosed', player, data));
-        player.on('playerResumed', (player) => this.emit('playerResumed', player));
-
-        this.emit('playerCreate', player);
-        return player;
-    }
-
-    /**
-     * Get an existing player
-     */
-    public getPlayer(guildId: string): KazagumoPlayer | undefined {
-        return this.players.get(guildId);
-    }
-
-    /**
-     * Destroy a player
-     */
-    public async destroyPlayer(guildId: string): Promise<boolean> {
-        const player = this.players.get(guildId);
-        if (!player) return false;
-
-        await player.destroy();
-        this.players.delete(guildId);
-        this.emit('playerDestroy', player);
-        return true;
-    }
-
-    /**
-     * Get the least used node for load balancing
-     */
-    private getLeastUsedNode(): any {
-        const nodes = [...this.shoukaku.nodes.values()];
-        if (nodes.length === 0) return null;
-
-        return nodes.reduce((prev, current) => {
-            const prevCount = prev.stats?.players || 0;
-            const currentCount = current.stats?.players || 0;
-            return (prevCount < currentCount) ? prev : current;
-        });
-    }
-
-    /**
-     * Enhanced auto-search with platform detection
-     */
-    public async autoSearch(query: string, options: KazagumoSearchOptions = {}): Promise<KazagumoSearchResult> {
-        return this.searchManager.autoSearch(query, options);
-    }
-
-    /**
-     * Get supported platforms from LavaSrc 4.7.2
-     */
-    public getSupportedPlatforms(): string[] {
-        return URLParser.getSupportedPlatforms().map(platform => {
-            const nameMap: Record<string, string> = {
-                'youtube': 'YouTube',
-                'youtubeMusic': 'YouTube Music',
-                'spotify': 'Spotify',
-                'applemusic': 'Apple Music',
-                'deezer': 'Deezer',
-                'soundcloud': 'SoundCloud',
-                'jiosaavn': 'JioSaavn',
-                'qobuz': 'Qobuz',
-                'tidal': 'Tidal',
-                'bandcamp': 'Bandcamp'
-            };
-            return nameMap[platform] || platform;
-        }).concat(['HTTP Streams']);
-    }
-
-    /**
-     * Get supported search engines
-     */
-    public getSupportedEngines(): string[] {
-        return this.searchManager.getSupportedEngines();
-    }
-
-    /**
-     * Parse URL and get platform information
-     */
-    public parseURL(url: string) {
-        return URLParser.parse(url);
-    }
-
-    /**
-     * Enhanced plugin management with configuration
-     */
-    public loadPluginWithConfig(plugin: KazagumoPlugin, config?: any): void {
-        try {
-            // Set plugin configuration if provided
-            if (config) {
-                this.pluginConfig.setPluginConfig(plugin.name, config);
-            }
-
-            // Check if plugin should be loaded based on configuration
-            const pluginConfig = this.pluginConfig.getPluginConfig(plugin.name);
-            if (!pluginConfig || !pluginConfig.enabled) {
-                console.log(`Plugin ${plugin.name} is disabled, skipping load`);
-                return;
-            }
-
-            // Validate dependencies
-            const errors = this.pluginConfig.validateDependencies();
-            if (errors.length > 0) {
-                throw ErrorHandler.createError(ErrorCode.PLUGIN_LOAD_FAILED, {
-                    plugin: plugin.name,
-                    dependencyErrors: errors
-                });
-            }
-
-            this.loadPlugin(plugin);
-        } catch (error) {
-            ErrorHandler.logError(error, 'PluginManager');
-            throw error;
-        }
-    }
-
-    /**
-     * Get plugin configuration and statistics
-     */
-    public getPluginStats() {
-        return {
-            ...this.pluginConfig.getStats(),
-            loadOrder: this.pluginConfig.getLoadOrder(),
-            errors: this.pluginConfig.validateDependencies()
-        };
-    }
-
-    /**
-     * Get comprehensive statistics
-     */
-    public getStats() {
-        const nodes = [...this.shoukaku.nodes.values()];
-        const players = [...this.players.values()];
-        
-        return {
-            players: this.players.size,
-            playingPlayers: players.filter(p => p.playing).length,
-            nodes: nodes.length,
-            connectedNodes: nodes.filter(n => n.state === 2).length, // 2 = CONNECTED
-            uptime: Date.now() - this.startTime,
-            memory: process.memoryUsage(),
-            search: this.searchManager.getStats(),
-            plugins: this.getPluginStats(),
-            version: '3.3.0',
-            library: 'Kaza'
-        };
-    }
-
-    /**
-     * Enhanced error handling wrapper for operations
-     */
-    public async safeOperation<T>(
-        operation: () => Promise<T>,
-        errorCode: ErrorCode,
-        context?: string
-    ): Promise<T> {
-        return ErrorHandler.handleAsync(operation, errorCode, context);
-    }
-
-    /**
-     * Health check for all components
-     */
-    public async healthCheck(): Promise<{
-        status: 'healthy' | 'degraded' | 'unhealthy';
-        components: Record<string, any>;
-    }> {
-        const components: Record<string, any> = {};
-
-        // Check nodes
-        const nodes = [...this.shoukaku.nodes.values()];
-        components.nodes = {
-            total: nodes.length,
-            connected: nodes.filter(n => n.state === 2).length,
-            status: nodes.length > 0 && nodes.some(n => n.state === 2) ? 'healthy' : 'unhealthy'
-        };
-
-        // Check players
-        components.players = {
-            total: this.players.size,
-            playing: [...this.players.values()].filter(p => p.playing).length,
-            status: 'healthy'
-        };
-
-        // Check search cache
-        const searchStats = this.searchManager.getStats();
-        components.search = {
-            cacheSize: searchStats.cacheSize,
-            platforms: searchStats.supportedPlatforms.length,
-            status: 'healthy'
-        };
-
-        // Check plugins
-        const pluginStats = this.getPluginStats();
-        components.plugins = {
-            loaded: pluginStats.enabled,
-            errors: pluginStats.errors.length,
-            status: pluginStats.errors.length === 0 ? 'healthy' : 'degraded'
-        };
-
-        // Overall status
-        const allHealthy = Object.values(components).every(c => c.status === 'healthy');
-        const anyUnhealthy = Object.values(components).some(c => c.status === 'unhealthy');
-        
-        const status = anyUnhealthy ? 'unhealthy' : allHealthy ? 'healthy' : 'degraded';
-
-        return { status, components };
-    }
-
-    /**
-     * Get node statistics
-     */
-    public async getNodeStats(): Promise<any[]> {
-        const nodes = [...this.shoukaku.nodes.values()];
-        const stats = await Promise.all(
-            nodes.map(async (node) => {
-                try {
-                    const nodeStats = await node.rest.stats();
-                    return {
-                        name: node.name,
-                        state: node.state,
-                        stats: nodeStats
-                    };
-                } catch (error) {
-                    return {
-                        name: node.name,
-                        state: node.state,
-                        error: error instanceof Error ? error.message : 'Unknown error'
-                    };
-                }
-            })
-        );
-        return stats;
-    }
-
-    /**
-     * Clean up and destroy the Kazagumo instance
-     */
-    public async destroy(): Promise<void> {
-        // Destroy all players
-        await Promise.all(
-            [...this.players.keys()].map(guildId => this.destroyPlayer(guildId))
-        );
-
-        // Unload all plugins
-        [...this.plugins].forEach(plugin => {
-            try {
-                this.unloadPlugin(plugin);
-            } catch (error) {
-                console.error(`Error unloading plugin ${plugin.name}:`, error);
-            }
-        });
-
-        // Disconnect all nodes
-        for (const [name, node] of this.shoukaku.nodes.entries()) {
-            node.disconnect(1000, 'Kazagumo shutdown');
-        }
-        
-        // Remove all listeners
-        this.removeAllListeners();
-    }
+// Type the EventEmitter correctly
+export interface Kazagumo {
+  on<K extends keyof KazagumoEvents>(event: K, listener: (...args: KazagumoEvents[K]) => void): this;
+  once<K extends keyof KazagumoEvents>(event: K, listener: (...args: KazagumoEvents[K]) => void): this;
+  emit<K extends keyof KazagumoEvents>(event: K, ...args: KazagumoEvents[K]): boolean;
+  off<K extends keyof KazagumoEvents>(event: K, listener: (...args: KazagumoEvents[K]) => void): this;
+  removeAllListeners<K extends keyof KazagumoEvents>(event?: K): this;
 }

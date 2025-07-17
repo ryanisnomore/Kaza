@@ -1,4 +1,11 @@
-// Kaza - Advanced Lavalink wrapper with intelligent multi-platform search
+/**
+ * Kaza - Advanced Lavalink wrapper with intelligent multi-platform search
+ * @version 3.3.0
+ * @author RY4N
+ * @license MIT
+ */
+
+// Core exports
 export { Kazagumo } from './Kazagumo';
 export { Kazagumo as Kaza } from './Kazagumo'; // Alias for the new name
 
@@ -32,17 +39,17 @@ import { ErrorHandler, ErrorCode } from './Utils/ErrorHandler';
 import { PluginConfig } from './config/PluginConfig';
 import { PlayerMoved } from './Plugins/PlayerMoved';
 
-export default { 
-    Kazagumo, 
-    Kaza: Kazagumo, 
-    KazagumoPlayer, 
-    KazagumoQueue, 
-    EnhancedSearchManager,
-    URLParser, 
-    ErrorHandler, 
-    ErrorCode,
-    PluginConfig,
-    PlayerMoved,
-    version,
-    libraryName
+export default {
+  Kazagumo,
+  Kaza: Kazagumo,
+  KazagumoPlayer,
+  KazagumoQueue,
+  EnhancedSearchManager,
+  URLParser,
+  ErrorHandler,
+  ErrorCode,
+  PluginConfig,
+  PlayerMoved,
+  version,
+  libraryName
 };
