@@ -1,8 +1,11 @@
 # Kaza - Advanced Discord Music Bot Library
 
 ![Version](https://img.shields.io/badge/version-3.3.0-blue.svg)
+![Downloads](https://img.shields.io/npm/dm/kaza)
+![GitHub contributors](https://img.shields.io/github/contributors/ryanisnomore/Kaza)
 ![Node.js](https://img.shields.io/badge/node-%3E%3D16.5.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.4.5-blue.svg)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/y/ryanisnomore/Kaza)
 ![License](https://img.shields.io/badge/license-ISC-green.svg)
 
 Kaza is a professional Discord music bot library built on top of Shoukaku, designed for modern multi-platform music streaming. It provides a robust foundation for building Discord music bots with intelligent search capabilities, comprehensive error handling, and advanced queue management.
