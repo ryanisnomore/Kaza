@@ -1,0 +1,110 @@
+# Source files
+src/
+tsconfig*.json
+tslint.json
+build-scripts/
+
+# Development files
+.vscode/
+.idea/
+*.log
+*.tmp
+*.temp
+
+# Test files
+test/
+tests/
+**/*.test.ts
+**/*.test.js
+**/*.spec.ts
+**/*.spec.js
+
+# Documentation build
+docs/
+*.md
+!README.md
+
+# Configuration files
+.env
+.env.*
+.gitignore
+.eslintrc*
+.prettierrc*
+nodemon.json
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Dependency directories
+node_modules/
+
+# Build artifacts
+*.tsbuildinfo
+.cache/
+
+# Example files
+example/
+examples/
+
+# Lavalink configuration
+application.yml
+lavalink.jar
+
+# Git files
+.git/
+.gitattributes
+.gitignore
+
+# CI/CD files
+.github/
+.gitlab-ci.yml
+.travis.yml
+appveyor.yml
+circle.yml
+azure-pipelines.yml
+
+# Package manager files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.pnpm-store/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+.temp/
+
+# Editor backup files
+*~
+*.bak
+*.tmp
+*.orig
+*.rej
+
+# Security files
+.env
+.env.local
+.env.production
+.env.test
