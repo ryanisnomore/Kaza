@@ -5,7 +5,7 @@ export { Kazagumo as Kaza } from './Kazagumo'; // Alias for the new name
 // Core managers
 export { KazagumoPlayer } from './Managers/KazagumoPlayer';
 export { KazagumoQueue } from './Managers/KazagumoQueue';
-export { EnhancedSearchManager } from './Managers/SearchManager';
+export { EnhancedSearchManager } from './Managers/EnhancedSearchManager';
 
 // Enhanced utilities
 export { URLParser } from './Utils/URLParser';
@@ -26,7 +26,7 @@ export const libraryName = 'Kaza';
 import { Kazagumo } from './Kazagumo';
 import { KazagumoPlayer } from './Managers/KazagumoPlayer';
 import { KazagumoQueue } from './Managers/KazagumoQueue';
-import { EnhancedSearchManager } from './Managers/SearchManager';
+import { EnhancedSearchManager } from './Managers/EnhancedSearchManager';
 import { URLParser } from './Utils/URLParser';
 import { ErrorHandler, ErrorCode } from './Utils/ErrorHandler';
 import { PluginConfig } from './config/PluginConfig';
